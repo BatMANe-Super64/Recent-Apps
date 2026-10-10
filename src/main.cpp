@@ -198,9 +198,28 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 }
 
 void RefreshRecentAppsNotification() {
-    if (!overlayVisible) return;
-    HideRecentAppsNotification();
-    ShowRecentAppsNotification();
+    if (!overlayVisible || !notificationLibraryReady) return;
+
+    const NotificationModuleHandle handle = notificationHandle.load();
+    if (handle == 0) {
+        ShowRecentAppsNotification();
+        return;
+    }
+
+    char text[256];
+    BuildRecentAppsNotification(text, sizeof(text));
+    const NotificationModuleStatus status =
+        NotificationModule_UpdateDynamicNotificationText(handle, text);
+
+    if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+        // Keep navigation usable on older or incompatible NotificationModule versions.
+        // The fallback can briefly flicker, but selection still updates.
+        HideRecentAppsNotification();
+        ShowRecentAppsNotification();
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Notification update fallback: %s",
+                            NotificationModule_GetStatusStr(status));
+    }
 }
 
 void MoveRecentSelection(int direction) {
