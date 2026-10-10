@@ -7,7 +7,7 @@
 #include <coreinit/cache.h>
 #include <gx2/context.h>
 #include <gx2/state.h>
-#include <memory/mappedmemory.h>
+#include <coreinit/memory.h>
 
 #include "shaders/ColorShader.h"
 
