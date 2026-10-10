@@ -19,7 +19,6 @@
 #include <atomic>
 
 WUPS_USE_WUT_DEVOPTAB();
-WUPS_FS_ACCESS();
 
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps")
 WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
@@ -501,12 +500,7 @@ DEINITIALIZE_PLUGIN() {
     }
 }
 
-ON_APPLICATION_START(args) {
-    if (!args.sd_mounted) {
-        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: SD not mounted");
-        return;
-    }
+ON_APPLICATION_START() {
     rememberTitle(OSGetTitleID());
 }
 
