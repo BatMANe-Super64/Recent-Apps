@@ -12,7 +12,6 @@
 #include <notifications/notifications.h>
 #include <gx2/swap.h>
 #include <gx2/context.h>
-#include "shaders/ColorShader.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -61,10 +60,13 @@ char launchRegistrationLine[96] = "Launch shortcut: not initialized";
 size_t selectedRecentIndex = 0;
 uint32_t overlayComboCallbackCount = 0;
 uint32_t gx2SwapHookCallCount = 0;
+uint32_t gx2CopyHookCallCount = 0;
+uint32_t gx2TvCopyHookCallCount = 0;
+uint32_t gx2DrcCopyHookCallCount = 0;
+uint32_t gx2LastColorBufferWidth = 0;
+uint32_t gx2LastColorBufferHeight = 0;
 bool gx2ContextObserved = false;
 bool gx2ContextSetupObserved = false;
-bool colorShaderInitAttempted = false;
-bool colorShaderInitSucceeded = false;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
 std::atomic<NotificationModuleHandle> notificationHandle{0};
@@ -569,9 +571,17 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create(gx2ContextSetupObserved
             ? "GX2 context setup: OBSERVED"
             : "GX2 context setup: NOT OBSERVED"));
-        root.add(WUPSConfigItemStub::Create(colorShaderInitAttempted
-            ? (colorShaderInitSucceeded ? "Shader initialization: OK" : "Shader initialization: FAILED")
-            : "Shader initialization: NOT TESTED"));
+        char gx2CopyLine[96];
+        std::snprintf(gx2CopyLine, sizeof(gx2CopyLine), "Color-buffer copy hooks: %lu (TV %lu / DRC %lu)",
+                      static_cast<unsigned long>(gx2CopyHookCallCount),
+                      static_cast<unsigned long>(gx2TvCopyHookCallCount),
+                      static_cast<unsigned long>(gx2DrcCopyHookCallCount));
+        root.add(WUPSConfigItemStub::Create(gx2CopyLine));
+        char gx2BufferLine[80];
+        std::snprintf(gx2BufferLine, sizeof(gx2BufferLine), "Last color buffer: %lux%lu",
+                      static_cast<unsigned long>(gx2LastColorBufferWidth),
+                      static_cast<unsigned long>(gx2LastColorBufferHeight));
+        root.add(WUPSConfigItemStub::Create(gx2BufferLine));
         root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
@@ -620,14 +630,19 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
 }
 WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
 
-// Diagnostic step: verify this GX2 hook is safe before restoring any drawing.
+// Keep this hook state-neutral while recording the actual scan-copy target and dimensions.
 DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
-    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
-    // Initialize shader objects once after the normal scan-buffer copy, without drawing.
-    if (!colorShaderInitAttempted) {
-        colorShaderInitAttempted = true;
-        colorShaderInitSucceeded = ColorShader::instance() != nullptr;
+    ++gx2CopyHookCallCount;
+    if (scanTarget == GX2_SCAN_TARGET_TV) {
+        ++gx2TvCopyHookCallCount;
+    } else if (scanTarget == GX2_SCAN_TARGET_DRC) {
+        ++gx2DrcCopyHookCallCount;
     }
+    if (colorBuffer != nullptr) {
+        gx2LastColorBufferWidth = colorBuffer->surface.width;
+        gx2LastColorBufferHeight = colorBuffer->surface.height;
+    }
+    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
 }
 WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
 
