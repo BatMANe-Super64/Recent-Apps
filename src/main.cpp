@@ -5,6 +5,7 @@
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
 #include <coreinit/cache.h>
+#include <sysapp/launch.h>
 #include <notifications/notifications.h>
 #include <gx2/swap.h>
 #include <gx2/context.h>
@@ -45,7 +46,13 @@ struct HistoryFile {
 
 uint64_t recentApps[kHistoryCount] = {};
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
+WUPSButtonCombo_ComboHandle previousComboHandle = {};
+WUPSButtonCombo_ComboHandle nextComboHandle = {};
+WUPSButtonCombo_ComboHandle launchComboHandle = {};
 char comboRegistrationLine[128] = "Shortcut registration: not initialized";
+char navigationRegistrationLine[128] = "Navigation shortcuts: not initialized";
+char launchRegistrationLine[96] = "Launch shortcut: not initialized";
+size_t selectedRecentIndex = 0;
 uint32_t overlayComboCallbackCount = 0;
 uint32_t gx2SwapHookCallCount = 0;
 bool gx2ContextObserved = false;
@@ -69,7 +76,8 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
         written = std::snprintf(buffer + used, bufferSize - used,
-                                "\n%02u. %016llX",
+                                "\\n%c%02u. %016llX",
+                                i == selectedRecentIndex ? '>' : ' ',
                                 static_cast<unsigned>(i + 1),
                                 static_cast<unsigned long long>(recentApps[i]));
         if (written < 0) break;
@@ -174,6 +182,7 @@ void rememberTitle(uint64_t titleId) {
 
     if (std::memcmp(recentApps, updated, sizeof(recentApps)) != 0) {
         std::memcpy(recentApps, updated, sizeof(recentApps));
+        selectedRecentIndex = 0;
         saveRecentApps();
     }
 }
@@ -188,12 +197,69 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
     }
 }
 
+void RefreshRecentAppsNotification() {
+    if (!overlayVisible) return;
+    HideRecentAppsNotification();
+    ShowRecentAppsNotification();
+}
+
+void MoveRecentSelection(int direction) {
+    if (!overlayVisible) return;
+
+    for (size_t attempt = 0; attempt < kHistoryCount; ++attempt) {
+        if (direction > 0) {
+            selectedRecentIndex = (selectedRecentIndex + 1) % kHistoryCount;
+        } else {
+            selectedRecentIndex = (selectedRecentIndex + kHistoryCount - 1) % kHistoryCount;
+        }
+
+        if (recentApps[selectedRecentIndex] != 0) {
+            RefreshRecentAppsNotification();
+            return;
+        }
+    }
+}
+
+void RecentAppsPreviousCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    MoveRecentSelection(-1);
+}
+
+void RecentAppsNextCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    MoveRecentSelection(1);
+}
+
+void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    if (!overlayVisible) return;
+
+    const uint64_t titleId = recentApps[selectedRecentIndex];
+    if (titleId == 0) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Launch skipped: no title selected");
+        return;
+    }
+    if (titleId == OSGetTitleID()) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Selected title is already running");
+        return;
+    }
+
+    HideRecentAppsNotification();
+    overlayVisible = false;
+    (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                        "Launch requested: %016llX",
+                        static_cast<unsigned long long>(titleId));
+    SYSLaunchTitle(titleId);
+}
+
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("Overlay shortcut diagnostics:"));
         root.add(WUPSConfigItemStub::Create(comboRegistrationLine));
+        root.add(WUPSConfigItemStub::Create(navigationRegistrationLine));
+        root.add(WUPSConfigItemStub::Create(launchRegistrationLine));
         root.add(WUPSConfigItemStub::Create(overlayVisible ? "Recent Apps notification: ON (TV + L toggles)" : "Recent Apps notification: OFF (TV + L toggles)"));
+        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select recent title; TV + A: launch selection"));
         root.add(WUPSConfigItemStub::Create(notificationStatusLine));
         char callbackLine[64];
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
@@ -297,9 +363,48 @@ INITIALIZE_PLUGIN() {
         &overlayComboHandle,
         &comboStatus);
     std::snprintf(comboRegistrationLine, sizeof(comboRegistrationLine),
-                  "Register: %s / Combo: %s",
+                  "TV + L: %s / %s",
                   WUPSButtonComboAPI_GetStatusStr(comboError),
                   WUPSButtonComboAPI_GetComboStatusStr(comboStatus));
+
+    WUPSButtonCombo_ComboStatus previousStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+    const WUPSButtonCombo_Error previousError = WUPSButtonComboAPI_AddButtonComboPressDown(
+        "Recent Apps: previous title (TV + Up)",
+        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_UP),
+        RecentAppsPreviousCallback,
+        nullptr,
+        &previousComboHandle,
+        &previousStatus);
+
+    WUPSButtonCombo_ComboStatus nextStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+    const WUPSButtonCombo_Error nextError = WUPSButtonComboAPI_AddButtonComboPressDown(
+        "Recent Apps: next title (TV + Down)",
+        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_DOWN),
+        RecentAppsNextCallback,
+        nullptr,
+        &nextComboHandle,
+        &nextStatus);
+
+    std::snprintf(navigationRegistrationLine, sizeof(navigationRegistrationLine),
+                  "TV + Up: %s/%s; Down: %s/%s",
+                  WUPSButtonComboAPI_GetStatusStr(previousError),
+                  WUPSButtonComboAPI_GetComboStatusStr(previousStatus),
+                  WUPSButtonComboAPI_GetStatusStr(nextError),
+                  WUPSButtonComboAPI_GetComboStatusStr(nextStatus));
+
+    WUPSButtonCombo_ComboStatus launchStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+    const WUPSButtonCombo_Error launchError = WUPSButtonComboAPI_AddButtonComboPressDown(
+        "Recent Apps: launch selected title (TV + A)",
+        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_A),
+        RecentAppsLaunchCallback,
+        nullptr,
+        &launchComboHandle,
+        &launchStatus);
+
+    std::snprintf(launchRegistrationLine, sizeof(launchRegistrationLine),
+                  "TV + A: %s / %s",
+                  WUPSButtonComboAPI_GetStatusStr(launchError),
+                  WUPSButtonComboAPI_GetComboStatusStr(launchStatus));
 
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent Apps"};
     (void)WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
@@ -314,6 +419,18 @@ DEINITIALIZE_PLUGIN() {
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
+    }
+    if (previousComboHandle.handle != nullptr) {
+        (void)WUPSButtonComboAPI_RemoveButtonCombo(previousComboHandle);
+        previousComboHandle.handle = nullptr;
+    }
+    if (nextComboHandle.handle != nullptr) {
+        (void)WUPSButtonComboAPI_RemoveButtonCombo(nextComboHandle);
+        nextComboHandle.handle = nullptr;
+    }
+    if (launchComboHandle.handle != nullptr) {
+        (void)WUPSButtonComboAPI_RemoveButtonCombo(launchComboHandle);
+        launchComboHandle.handle = nullptr;
     }
 }
 
