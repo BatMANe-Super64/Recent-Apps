@@ -70,6 +70,7 @@ std::atomic<NotificationModuleHandle> notificationHandle{0};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
 char historyStatusLine[96] = "History: not checked";
 char titleIconStatusLine[128] = "Title icons: not checked";
+alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     size_t used = 0;
@@ -192,7 +193,6 @@ void inspectRecentTitleIcon(size_t index) {
     const uint32_t titleHigh = static_cast<uint32_t>(titleId >> 32);
     const uint32_t titleLow = static_cast<uint32_t>(titleId & 0xFFFFFFFFULL);
 
-    // Check both known installed-title locations and ACP's metadata directory.
     char candidatePaths[3][320] = {};
     std::snprintf(candidatePaths[0], sizeof(candidatePaths[0]),
                   "/vol/storage_mlc01/usr/title/%08X/%08X/meta/iconTex.tga",
@@ -214,17 +214,15 @@ void inspectRecentTitleIcon(size_t index) {
 
     for (const char* path : candidatePaths) {
         if (path[0] == '\0') continue;
-        struct stat info = {};
-        if (stat(path, &info) != 0 || info.st_size < 18) continue;
 
         FILE* iconFile = std::fopen(path, "rb");
         if (iconFile == nullptr) continue;
 
-        // TGA dimensions and pixel depth are stored in the 18-byte header.
         uint8_t header[18] = {};
-        const size_t bytesRead = std::fread(header, 1, sizeof(header), iconFile);
-        std::fclose(iconFile);
-        if (bytesRead != sizeof(header)) continue;
+        if (std::fread(header, 1, sizeof(header), iconFile) != sizeof(header)) {
+            std::fclose(iconFile);
+            continue;
+        }
 
         const uint16_t width = static_cast<uint16_t>(header[12]) |
                                (static_cast<uint16_t>(header[13]) << 8);
@@ -232,16 +230,55 @@ void inspectRecentTitleIcon(size_t index) {
                                 (static_cast<uint16_t>(header[15]) << 8);
         const uint8_t imageType = header[2];
         const uint8_t pixelDepth = header[16];
+        const uint8_t descriptor = header[17];
         const char* location = std::strstr(path, "storage_usb01") != nullptr
             ? "USB" : (std::strstr(path, "storage_mlc01") != nullptr ? "MLC" : "ACP");
 
+        // The first rendering experiment supports the installed Wii U icon format:
+        // uncompressed 128x128, 32-bit true-color TGA. Reject anything else safely.
+        if (width != 128 || height != 128 || imageType != 2 || pixelDepth != 32 ||
+            header[1] != 0) {
+            std::fclose(iconFile);
+            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                          "Icon %s: unsupported TGA format", location);
+            return;
+        }
+
+        const uint8_t idLength = header[0];
+        if (idLength != 0 && std::fseek(iconFile, idLength, SEEK_CUR) != 0) {
+            std::fclose(iconFile);
+            continue;
+        }
+
+        uint8_t source[128 * 128 * 4];
+        if (std::fread(source, 1, sizeof(source), iconFile) != sizeof(source)) {
+            std::fclose(iconFile);
+            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                          "Icon %s: pixel data read failed", location);
+            return;
+        }
+        std::fclose(iconFile);
+
+        const bool topOrigin = (descriptor & 0x20) != 0;
+        const bool rightOrigin = (descriptor & 0x10) != 0;
+        for (uint32_t y = 0; y < 128; ++y) {
+            for (uint32_t x = 0; x < 128; ++x) {
+                const uint32_t sourceX = rightOrigin ? 127 - x : x;
+                const uint32_t sourceY = topOrigin ? y : 127 - y;
+                const size_t src = (static_cast<size_t>(sourceY) * 128 + sourceX) * 4;
+                const size_t dst = (static_cast<size_t>(y) * 128 + x) * 4;
+                // TGA true-color pixels are stored in BGRA byte order.
+                titleIconRgba[dst + 0] = source[src + 2];
+                titleIconRgba[dst + 1] = source[src + 1];
+                titleIconRgba[dst + 2] = source[src + 0];
+                titleIconRgba[dst + 3] = source[src + 3];
+            }
+        }
+
+        GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER,
+                      titleIconRgba, sizeof(titleIconRgba));
         std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Icon %s: %ux%u, %u-bit TGA type %u, %lu B",
-                      location, static_cast<unsigned>(width),
-                      static_cast<unsigned>(height),
-                      static_cast<unsigned>(pixelDepth),
-                      static_cast<unsigned>(imageType),
-                      static_cast<unsigned long>(info.st_size));
+                      "Icon %s decoded: 128x128 RGBA", location);
         return;
     }
 
