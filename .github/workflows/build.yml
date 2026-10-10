@@ -28,13 +28,13 @@ jobs:
           docker run --rm -v "$PWD:/project" recent-apps-builder sh -lc '
             make clean
             make
-            test -s WiiUKioskRecentApps.wps
+            test -s RecentAppMenu.wps
           '
 
       - name: Upload WPS artifact
         uses: actions/upload-artifact@v4
         with:
-          name: WiiUKioskRecentApps-Plugin
-          path: WiiUKioskRecentApps.wps
+          name: RecentAppMenu-Plugin
+          path: RecentAppMenu.wps
           if-no-files-found: error
           compression-level: 0
