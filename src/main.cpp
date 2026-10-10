@@ -4,7 +4,6 @@
 #include <wups/config_api.h>
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
-#include <coreinit/screen.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -18,9 +17,6 @@ WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen 
 WUPS_PLUGIN_VERSION("v0.6-alpha");
 WUPS_PLUGIN_AUTHOR("Developer");
 WUPS_PLUGIN_LICENSE("GPL-3.0");
-
-// Enable the WUPS overlay helpers used by the official overlay test example.
-WUPS_ALLOW_OVERLAY();
 
 namespace {
 constexpr uint64_t kHomeMenuUsa = 0x0005001010040100ULL;
@@ -100,17 +96,8 @@ void rememberTitle(uint64_t titleId) {
     }
 }
 
-void RecentAppsOverlayCallback(wups_overlay_options_type_t screen, void*) {
-    WUPS_Overlay_OSScreenClear(screen);
-    WUPS_Overlay_PrintTextOnScreen(screen, 1, 1, "Recent Apps overlay is working!");
-    WUPS_Overlay_PrintTextOnScreen(screen, 1, 3, "Shortcut: TV + L");
-    WUPS_Overlay_PrintTextOnScreen(screen, 1, 5, "Recent title history will be shown here.");
-    WUPS_Overlay_FlipBuffers(screen);
-}
-
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     ++overlayComboCallbackCount;
-    WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, RecentAppsOverlayCallback, nullptr);
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
