@@ -11,9 +11,9 @@ include $(DEVKITPRO)/wups/share/wups_rules
 
 TARGET   := WiiUKioskRecentApps
 BUILD    := build
-SOURCES  := src
+SOURCES  := src src/shaders
 DATA     :=
-INCLUDES := src
+INCLUDES := src src/shaders
 
 CFLAGS := -g -Wall -O2 -ffunction-sections $(MACHDEP)
 CFLAGS += $(INCLUDE) -D__WIIU__ -D__WUT__ -D__WUPS__

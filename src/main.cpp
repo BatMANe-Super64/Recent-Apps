@@ -4,6 +4,12 @@
 #include <wups/config_api.h>
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
+#include <coreinit/cache.h>
+#include <gx2/context.h>
+#include <gx2/state.h>
+#include <memory/mappedmemory.h>
+
+#include "shaders/ColorShader.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -42,6 +48,10 @@ WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 uint32_t overlayComboCallbackCount = 0;
 uint32_t gx2SwapHookCallCount = 0;
+bool overlayVisible = false;
+GX2ContextState* overlayContextState = nullptr;
+GX2ContextState* originalContextState = nullptr;
+uint8_t* overlayColorVertices = nullptr;
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -99,6 +109,7 @@ void rememberTitle(uint64_t titleId) {
 
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     ++overlayComboCallbackCount;
+    overlayVisible = !overlayVisible;
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
@@ -106,6 +117,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("Overlay shortcut diagnostics:"));
         root.add(WUPSConfigItemStub::Create(comboRegistrationLine));
+        root.add(WUPSConfigItemStub::Create(overlayVisible ? "Test panel: ON (TV + L toggles)" : "Test panel: OFF (TV + L toggles)"));
         char callbackLine[64];
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
@@ -143,7 +155,80 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 void ConfigMenuClosedCallback() {}
 } // namespace
 
-// First rendering milestone: confirm the frame-swap hook runs before adding any GPU drawing.
+DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
+    real_GX2SetContextState(state);
+    if (state != overlayContextState) originalContextState = state;
+}
+WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
+
+DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
+    real_GX2SetupContextStateEx(state, enable);
+    if (state != overlayContextState) originalContextState = state;
+}
+WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
+
+DECL_FUNCTION(void, GX2Init, uint32_t attributes) {
+    real_GX2Init(attributes);
+    if (overlayContextState == nullptr) {
+        overlayContextState = static_cast<GX2ContextState*>(
+            MEMAllocFromMappedMemoryForGX2Ex(sizeof(GX2ContextState), 0x100));
+        if (overlayContextState != nullptr) {
+            real_GX2SetupContextStateEx(overlayContextState, GX2_TRUE);
+            DCInvalidateRange(overlayContextState, sizeof(GX2ContextState));
+        }
+        overlayColorVertices = static_cast<uint8_t*>(
+            MEMAllocFromMappedMemoryForGX2Ex(ColorShader::cuColorVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT));
+        if (overlayColorVertices != nullptr) {
+            const uint8_t colors[16] = {
+                36, 105, 220, 238, 36, 105, 220, 238,
+                36, 105, 220, 238, 36, 105, 220, 238
+            };
+            std::memcpy(overlayColorVertices, colors, sizeof(colors));
+            GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, overlayColorVertices, sizeof(colors));
+        }
+        (void) ColorShader::instance();
+    }
+}
+WUPS_MUST_REPLACE(GX2Init, WUPS_LOADER_LIBRARY_GX2, GX2Init);
+
+void drawTestPanel(GX2ColorBuffer* colorBuffer) {
+    if (!overlayVisible || overlayContextState == nullptr || originalContextState == nullptr ||
+        colorBuffer == nullptr || colorBuffer->surface.image == nullptr || overlayColorVertices == nullptr) return;
+
+    real_GX2SetContextState(overlayContextState);
+    GX2SetDefaultState();
+    GX2SetColorBuffer(colorBuffer, GX2_RENDER_TARGET_0);
+    GX2SetViewport(0.0f, 0.0f, static_cast<float>(colorBuffer->surface.width),
+                   static_cast<float>(colorBuffer->surface.height), 0.0f, 1.0f);
+    GX2SetScissor(0, 0, colorBuffer->surface.width, colorBuffer->surface.height);
+    GX2SetDepthOnlyControl(GX2_FALSE, GX2_FALSE, GX2_COMPARE_FUNC_NEVER);
+    GX2SetAlphaTest(GX2_TRUE, GX2_COMPARE_FUNC_GREATER, 0.0f);
+    GX2SetColorControl(GX2_LOGIC_OP_COPY, GX2_ENABLE, GX2_DISABLE, GX2_ENABLE);
+
+    ColorShader* shader = ColorShader::instance();
+    if (shader != nullptr) {
+        const float angle = 0.0f;
+        const float offset[4] = {-0.48f, 0.52f, 0.0f, 0.0f};
+        const float scale[4] = {0.42f, 0.25f, 1.0f, 0.0f};
+        const float intensity[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        shader->setShaders();
+        shader->setAttributeBuffer(overlayColorVertices);
+        shader->setAngle(angle);
+        shader->setOffset(offset);
+        shader->setScale(scale);
+        shader->setColorIntensity(intensity);
+        Shader::draw(GX2_PRIMITIVE_MODE_QUADS, 4);
+        GX2Flush();
+    }
+    real_GX2SetContextState(originalContextState);
+}
+
+DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
+    if (scanTarget == GX2_SCAN_TARGET_TV) drawTestPanel(colorBuffer);
+    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
+}
+WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
+
 DECL_FUNCTION(void, GX2SwapScanBuffers) {
     ++gx2SwapHookCallCount;
     real_GX2SwapScanBuffers();
@@ -171,6 +256,15 @@ INITIALIZE_PLUGIN() {
 }
 
 DEINITIALIZE_PLUGIN() {
+    ColorShader::destroyInstance();
+    if (overlayColorVertices != nullptr) {
+        MEMFreeToMappedMemory(overlayColorVertices);
+        overlayColorVertices = nullptr;
+    }
+    if (overlayContextState != nullptr) {
+        MEMFreeToMappedMemory(overlayContextState);
+        overlayContextState = nullptr;
+    }
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
