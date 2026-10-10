@@ -10,9 +10,6 @@
 #include <sysapp/launch.h>
 #include <vpad/input.h>
 #include <notifications/notifications.h>
-#include <gx2/swap.h>
-#include <gx2/surface.h>
-#include <gx2/context.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -59,15 +56,6 @@ char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 char navigationRegistrationLine[128] = "Navigation shortcuts: not initialized";
 char launchRegistrationLine[96] = "Launch shortcut: not initialized";
 size_t selectedRecentIndex = 0;
-uint32_t overlayComboCallbackCount = 0;
-uint32_t gx2SwapHookCallCount = 0;
-uint32_t gx2CopyHookCallCount = 0;
-uint32_t gx2TvCopyHookCallCount = 0;
-uint32_t gx2DrcCopyHookCallCount = 0;
-uint32_t gx2LastColorBufferWidth = 0;
-uint32_t gx2LastColorBufferHeight = 0;
-bool gx2ContextObserved = false;
-bool gx2ContextSetupObserved = false;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
 std::atomic<NotificationModuleHandle> notificationHandle{0};
@@ -463,7 +451,6 @@ void rememberTitle(uint64_t titleId, bool explicitlyLaunched = false) {
 }
 
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
-    ++overlayComboCallbackCount;
     overlayVisible = !overlayVisible;
     if (overlayVisible) {
         ShowRecentAppsNotification();
@@ -602,43 +589,6 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
     return result;
 }
 WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
-
-// Keep this hook state-neutral while recording the actual scan-copy target and dimensions.
-DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
-    ++gx2CopyHookCallCount;
-    if (scanTarget == GX2_SCAN_TARGET_TV) {
-        ++gx2TvCopyHookCallCount;
-    } else if (scanTarget == GX2_SCAN_TARGET_DRC) {
-        ++gx2DrcCopyHookCallCount;
-    }
-    if (colorBuffer != nullptr) {
-        gx2LastColorBufferWidth = colorBuffer->surface.width;
-        gx2LastColorBufferHeight = colorBuffer->surface.height;
-    }
-    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
-}
-WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
-
-// Third diagnostic: observe the active GX2 context without changing it.
-DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
-    if (state != nullptr) gx2ContextObserved = true;
-    real_GX2SetContextState(state);
-}
-WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
-
-// Fourth diagnostic: observe context setup without altering the requested operation.
-DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
-    real_GX2SetupContextStateEx(state, enable);
-    if (state != nullptr) gx2ContextSetupObserved = true;
-}
-WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
-
-// Second diagnostic: observe scan-buffer swaps without changing rendering state.
-DECL_FUNCTION(void, GX2SwapScanBuffers) {
-    ++gx2SwapHookCallCount;
-    real_GX2SwapScanBuffers();
-}
-WUPS_MUST_REPLACE(GX2SwapScanBuffers, WUPS_LOADER_LIBRARY_GX2, GX2SwapScanBuffers);
 
 INITIALIZE_PLUGIN() {
     ACPInitialize();
