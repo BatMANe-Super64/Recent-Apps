@@ -20,6 +20,7 @@
 #include <string>
 #include <atomic>
 #include <sys/stat.h>
+#include <dirent.h>
 
 WUPS_USE_WUT_DEVOPTAB();
 WUPS_USE_STORAGE("recent_apps_history");
@@ -183,6 +184,64 @@ bool isHealthAndSafetyTitle(uint64_t titleId) {
 }
 
 
+bool sdHomebrewMetaMatches(const char* metaPath, const char* appName) {
+    if (appName == nullptr || appName[0] == '\0') return false;
+    FILE* metaFile = std::fopen(metaPath, "r");
+    if (metaFile == nullptr) return false;
+
+    char line[256];
+    bool matched = false;
+    while (std::fgets(line, sizeof(line), metaFile) != nullptr) {
+        // Homebrew meta.xml commonly stores the visible app name in <name>.
+        char* begin = std::strstr(line, "<name>");
+        if (begin == nullptr) continue;
+        begin += 6;
+        char* finish = std::strstr(begin, "</name>");
+        if (finish == nullptr) continue;
+        *finish = '\0';
+        if (std::strcmp(begin, appName) == 0) {
+            matched = true;
+            break;
+        }
+    }
+    std::fclose(metaFile);
+    return matched;
+}
+
+bool findSdHomebrewIcon(const char* appName, char* foundPath, size_t foundPathSize) {
+    DIR* appsDirectory = opendir("sd:/wiiu/apps");
+    if (appsDirectory == nullptr) return false;
+
+    struct dirent* entry;
+    while ((entry = readdir(appsDirectory)) != nullptr) {
+        if (entry->d_name[0] == '.') continue;
+
+        char appDirectory[384];
+        char metaPath[448];
+        char iconPath[448];
+        std::snprintf(appDirectory, sizeof(appDirectory), "sd:/wiiu/apps/%s", entry->d_name);
+        std::snprintf(metaPath, sizeof(metaPath), "%s/meta.xml", appDirectory);
+
+        struct stat info = {};
+        if (stat(metaPath, &info) != 0 || !sdHomebrewMetaMatches(metaPath, appName)) continue;
+
+        // Most Wii U homebrew apps use icon.png. TGA variants are accepted
+        // as candidates too, but only installed-title TGA is decoded in this step.
+        const char* iconNames[] = {"icon.png", "icon.tga", "iconTex.tga"};
+        for (const char* iconName : iconNames) {
+            std::snprintf(iconPath, sizeof(iconPath), "%s/%s", appDirectory, iconName);
+            if (stat(iconPath, &info) == 0 && info.st_size > 0) {
+                std::snprintf(foundPath, foundPathSize, "%s", iconPath);
+                closedir(appsDirectory);
+                return true;
+            }
+        }
+    }
+
+    closedir(appsDirectory);
+    return false;
+}
+
 void inspectRecentTitleIcon(size_t index) {
     if (index >= kHistoryCount || recentApps[index] == 0) {
         std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
@@ -235,8 +294,6 @@ void inspectRecentTitleIcon(size_t index) {
         const char* location = std::strstr(path, "storage_usb01") != nullptr
             ? "USB" : (std::strstr(path, "storage_mlc01") != nullptr ? "MLC" : "ACP");
 
-        // The first rendering experiment supports the installed Wii U icon format:
-        // uncompressed 128x128, 32-bit true-color TGA. Reject anything else safely.
         if (width != 128 || height != 128 || imageType != 2 || pixelDepth != 32 ||
             header[1] != 0) {
             std::fclose(iconFile);
@@ -267,7 +324,6 @@ void inspectRecentTitleIcon(size_t index) {
                 const uint32_t sourceY = topOrigin ? y : 127 - y;
                 const size_t src = (static_cast<size_t>(sourceY) * 128 + sourceX) * 4;
                 const size_t dst = (static_cast<size_t>(y) * 128 + x) * 4;
-                // TGA true-color pixels are stored in BGRA byte order.
                 titleIconRgba[dst + 0] = titleIconSourceBgra[src + 2];
                 titleIconRgba[dst + 1] = titleIconSourceBgra[src + 1];
                 titleIconRgba[dst + 2] = titleIconSourceBgra[src + 0];
@@ -280,8 +336,21 @@ void inspectRecentTitleIcon(size_t index) {
         return;
     }
 
+    char sdIconPath[448] = {};
+    const char* appName = recentAppNames[index];
+    if (findSdHomebrewIcon(appName, sdIconPath, sizeof(sdIconPath))) {
+        if (std::strstr(sdIconPath, ".png") != nullptr) {
+            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                          "SD homebrew PNG found; decoder needed");
+        } else {
+            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                          "SD homebrew TGA found; format check needed");
+        }
+        return;
+    }
+
     std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                  "Title icon not found on MLC, USB, or ACP path");
+                  "No icon found for this title on MLC, USB, ACP, or SD");
 }
 
 void resolveRecentAppName(size_t index) {
