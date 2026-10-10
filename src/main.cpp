@@ -147,12 +147,35 @@ bool isHomeMenuTitle(uint64_t titleId) {
 }
 
 bool isHealthAndSafetyTitle(uint64_t titleId) {
-    return titleId == kHealthSafetyUsa ||
-           titleId == kHealthSafetyEur ||
-           titleId == kHealthSafetyJpn ||
-           titleId == kHealthSafetyKor ||
-           titleId == kHealthSafetyTwn ||
-           titleId == kHealthSafetyChn;
+    if (titleId == kHealthSafetyUsa ||
+        titleId == kHealthSafetyEur ||
+        titleId == kHealthSafetyJpn ||
+        titleId == kHealthSafetyKor ||
+        titleId == kHealthSafetyTwn ||
+        titleId == kHealthSafetyChn) {
+        return true;
+    }
+
+    // Some firmware/region combinations may report a different title ID.
+    // Fall back to installed title metadata so the startup hook cannot
+    // accidentally promote Health and Safety into the recent-app list.
+    if (acpReady) {
+        alignas(0x40) ACPMetaXml metadata = {};
+        if (ACPGetTitleMetaXml(titleId, &metadata) == ACP_RESULT_SUCCESS) {
+            const char* names[] = {
+                metadata.shortname_en,
+                metadata.longname_en
+            };
+            for (const char* name : names) {
+                if (std::strstr(name, "Health and Safety") != nullptr ||
+                    std::strstr(name, "Health & Safety") != nullptr ||
+                    std::strstr(name, "Health and Safety Information") != nullptr) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 void resolveRecentAppName(size_t index) {
