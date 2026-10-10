@@ -47,6 +47,8 @@ constexpr char kHistoryStorageId[] = "recent_apps_history";
 constexpr char kBackgroundColorStorageId[] = "background_color";
 constexpr uint32_t kDefaultBackgroundColor = 0;
 constexpr uint32_t kBackgroundColorCount = 51;
+constexpr uint32_t kUseGlobalBackgroundColor = kBackgroundColorCount;
+constexpr char kSlotBackgroundColorStoragePrefix[] = "slot_color_";
 
 uint64_t recentApps[kHistoryCount] = {};
 char recentAppNames[kHistoryCount][64] = {};
@@ -58,6 +60,7 @@ WUPSButtonCombo_ComboHandle nextComboHandle = {};
 WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 uint32_t backgroundColorSelection = kDefaultBackgroundColor;
+uint32_t slotBackgroundColorSelections[kHistoryCount] = {};
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
 constexpr size_t kHomeNotificationIndex = kHistoryCount;
@@ -143,17 +146,22 @@ NMColor BackgroundColorForSelection(uint32_t selection) {
 void ApplyNotificationBackgroundColor() {
     if (!notificationLibraryReady) return;
 
-    const NMColor color = BackgroundColorForSelection(backgroundColorSelection);
+    const NMColor globalColor = BackgroundColorForSelection(backgroundColorSelection);
     (void)NotificationModule_SetDefaultValue(
         NOTIFICATION_MODULE_NOTIFICATION_TYPE_DYNAMIC,
         NOTIFICATION_MODULE_DEFAULT_OPTION_BACKGROUND_COLOR,
-        color);
+        globalColor);
 
-    // Also update currently visible rows if the setting changes while the menu is open.
-    for (const NotificationModuleHandle handle : notificationHandles) {
-        if (handle != 0) {
-            (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(handle, color);
-        }
+    // App rows use their numbered slot's color; HOME and the header use the global color.
+    for (size_t i = 0; i < (sizeof(notificationHandles) / sizeof(notificationHandles[0])); ++i) {
+        const NotificationModuleHandle handle = notificationHandles[i];
+        if (handle == 0) continue;
+
+        const uint32_t selection = i < kHistoryCount
+            ? slotBackgroundColorSelections[i] : kUseGlobalBackgroundColor;
+        const NMColor color = selection == kUseGlobalBackgroundColor
+            ? globalColor : BackgroundColorForSelection(selection);
+        (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(handle, color);
     }
 }
 
@@ -719,8 +727,81 @@ void BackgroundColorChangedCallback(ConfigItemMultipleValues*, uint32_t newValue
     }
 }
 
+void LoadSlotBackgroundColors() {
+    for (size_t slot = 0; slot < kHistoryCount; ++slot) {
+        char key[32] = {};
+        (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
+                            static_cast<unsigned>(slot + 1));
+        slotBackgroundColorSelections[slot] = kUseGlobalBackgroundColor;
+        const WUPSStorageError error = WUPSStorageAPI::GetOrStoreDefault<uint32_t>(
+            key, slotBackgroundColorSelections[slot], kUseGlobalBackgroundColor);
+        if (error != WUPS_STORAGE_ERROR_SUCCESS ||
+            slotBackgroundColorSelections[slot] > kUseGlobalBackgroundColor) {
+            slotBackgroundColorSelections[slot] = kUseGlobalBackgroundColor;
+        }
+    }
+}
+
+void SlotBackgroundColorChanged(size_t slot, uint32_t newValue) {
+    if (slot >= kHistoryCount) return;
+    slotBackgroundColorSelections[slot] = newValue <= kUseGlobalBackgroundColor
+        ? newValue : kUseGlobalBackgroundColor;
+
+    char key[32] = {};
+    (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
+                        static_cast<unsigned>(slot + 1));
+    const WUPSStorageError error = WUPSStorageAPI::Store(key, slotBackgroundColorSelections[slot]);
+    if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Slot color save failed: %.44s",
+                            WUPSStorageAPI::GetStatusStr(error));
+    }
+    ApplyNotificationBackgroundColor();
+}
+
+void SlotBackgroundColorChanged0(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(0, newValue);
+}
+
+void SlotBackgroundColorChanged1(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(1, newValue);
+}
+
+void SlotBackgroundColorChanged2(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(2, newValue);
+}
+
+void SlotBackgroundColorChanged3(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(3, newValue);
+}
+
+void SlotBackgroundColorChanged4(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(4, newValue);
+}
+
+void SlotBackgroundColorChanged5(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(5, newValue);
+}
+
+void SlotBackgroundColorChanged6(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(6, newValue);
+}
+
+void SlotBackgroundColorChanged7(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(7, newValue);
+}
+
+void SlotBackgroundColorChanged8(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(8, newValue);
+}
+
+void SlotBackgroundColorChanged9(ConfigItemMultipleValues*, uint32_t newValue) {
+    SlotBackgroundColorChanged(9, newValue);
+}
+
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
+        LoadSlotBackgroundColors();
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
         root.add(WUPSConfigItemStub::Create("TV + Up/Down: select HOME or a recent title"));
@@ -782,6 +863,77 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemMultipleValues::CreateFromValue(
             kBackgroundColorStorageId, "Background Color", kDefaultBackgroundColor,
             backgroundColorSelection, backgroundColorOptions, &BackgroundColorChangedCallback));
+
+        constexpr WUPSConfigItemMultipleValues::ValuePair slotBackgroundColorOptions[] = {
+            {0, "Default Gray"},
+            {1, "Black"},
+            {2, "Charcoal"},
+            {3, "Dark Gray"},
+            {4, "Slate"},
+            {5, "Silver"},
+            {6, "Ghost Gray"},
+            {7, "Red"},
+            {8, "Blood Red"},
+            {9, "Crimson"},
+            {10, "Coral"},
+            {11, "Orange"},
+            {12, "Halloween Orange"},
+            {13, "Pumpkin"},
+            {14, "Amber"},
+            {15, "Gold"},
+            {16, "Yellow"},
+            {17, "Lime"},
+            {18, "Toxic Green"},
+            {19, "Green"},
+            {20, "Emerald"},
+            {21, "Mint"},
+            {22, "Teal"},
+            {23, "Cyan"},
+            {24, "Ice Blue"},
+            {25, "Sky Blue"},
+            {26, "Blue"},
+            {27, "Royal Blue"},
+            {28, "Navy"},
+            {29, "Midnight Blue"},
+            {30, "Indigo"},
+            {31, "Purple"},
+            {32, "Midnight Purple"},
+            {33, "Violet"},
+            {34, "Lavender"},
+            {35, "Magenta"},
+            {36, "Hot Pink"},
+            {37, "Pink"},
+            {38, "Rose"},
+            {39, "Brown"},
+            {40, "Chocolate"},
+            {41, "Copper"},
+            {42, "Sand"},
+            {43, "Cream"},
+            {44, "Forest Green"},
+            {45, "Ocean Blue"},
+            {46, "Neon Blue"},
+            {47, "Neon Green"},
+            {48, "Neon Pink"},
+            {49, "Sunset"},
+            {50, "Aurora"},
+            {kUseGlobalBackgroundColor, "Use Global Color"},
+        };
+        root.add(WUPSConfigItemStub::Create("Per-Slot Background Colors"));
+        using SlotColorCallback = void (*)(ConfigItemMultipleValues*, uint32_t);
+        constexpr SlotColorCallback slotColorCallbacks[] = {&SlotBackgroundColorChanged0, &SlotBackgroundColorChanged1, &SlotBackgroundColorChanged2, &SlotBackgroundColorChanged3, &SlotBackgroundColorChanged4, &SlotBackgroundColorChanged5, &SlotBackgroundColorChanged6, &SlotBackgroundColorChanged7, &SlotBackgroundColorChanged8, &SlotBackgroundColorChanged9};
+        for (size_t slot = 0; slot < kHistoryCount; ++slot) {
+            char key[32] = {};
+            char label[112] = {};
+            (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
+                                static_cast<unsigned>(slot + 1));
+            const char* titleName = recentApps[slot] == 0
+                ? "Empty" : (recentAppNames[slot][0] != '\\0' ? recentAppNames[slot] : "Unnamed title");
+            (void)std::snprintf(label, sizeof(label), "Slot %02u: %.58s",
+                                static_cast<unsigned>(slot + 1), titleName);
+            root.add(WUPSConfigItemMultipleValues::CreateFromValue(
+                key, label, kUseGlobalBackgroundColor, slotBackgroundColorSelections[slot],
+                slotBackgroundColorOptions, slotColorCallbacks[slot]));
+        }
     } catch (...) {
         return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
     }
@@ -821,6 +973,7 @@ INITIALIZE_PLUGIN() {
     acpReady = true;
     loadBackgroundColorSetting();
     loadRecentApps();
+    LoadSlotBackgroundColors();
     resolveAllRecentAppNames();
     inspectRecentTitleIcon(0);
 
