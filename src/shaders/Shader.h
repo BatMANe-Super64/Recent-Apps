@@ -24,7 +24,7 @@
 #include <gx2/registers.h>
 #include <gx2/shaders.h>
 #include <gx2/texture.h>
-#include <memory/mappedmemory.h>
+#include <coreinit/memory.h>
 
 class Shader {
 protected:

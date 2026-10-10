@@ -18,7 +18,7 @@
 
 #include "Shader.h"
 #include <malloc.h>
-#include <memory/mappedmemory.h>
+#include <coreinit/memory.h>
 
 class FetchShader : public Shader {
 public:
