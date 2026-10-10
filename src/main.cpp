@@ -41,7 +41,6 @@ uint64_t recentApps[kHistoryCount] = {};
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 uint32_t overlayComboCallbackCount = 0;
-uint32_t vsyncCallbackCount = 0;
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -110,10 +109,6 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
         root.add(WUPSConfigItemStub::Create(callbackLine));
-        char vsyncLine[64];
-        std::snprintf(vsyncLine, sizeof(vsyncLine), "VSync hook calls: %lu",
-                      static_cast<unsigned long>(vsyncCallbackCount));
-        root.add(WUPSConfigItemStub::Create(vsyncLine));
         root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
@@ -174,7 +169,3 @@ ON_APPLICATION_START() {
     rememberTitle(OSGetTitleID());
 }
 
-// Diagnostic only: verify the WUPS per-frame hook executes on hardware.
-ON_VYSNC() {
-    ++vsyncCallbackCount;
-}
