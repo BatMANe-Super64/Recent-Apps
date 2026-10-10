@@ -1,0 +1,40 @@
+name: Build Wii U Aroma Plugin
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build WUPS plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build toolchain image
+        run: docker build --pull -t quickresolution-builder .
+
+      - name: Compile plugin
+        run: |
+          docker run --rm -v "$PWD:/project" quickresolution-builder sh -lc '
+            make clean
+            make
+            test -s QuickResolution.wps
+          '
+
+      - name: Upload WPS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuickResolution-Plugin
+          path: QuickResolution.wps
+          if-no-files-found: error
+          compression-level: 0
