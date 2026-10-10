@@ -552,41 +552,10 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
-        root.add(WUPSConfigItemStub::Create("Overlay shortcut diagnostics:"));
-        root.add(WUPSConfigItemStub::Create(comboRegistrationLine));
-        root.add(WUPSConfigItemStub::Create(navigationRegistrationLine));
-        root.add(WUPSConfigItemStub::Create(launchRegistrationLine));
-        root.add(WUPSConfigItemStub::Create(overlayVisible ? "Recent Apps notification: ON (TV + L toggles)" : "Recent Apps notification: OFF (TV + L toggles)"));
-        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select recent title; TV + A: launch selection"));
-        root.add(WUPSConfigItemStub::Create(notificationStatusLine));
-        root.add(WUPSConfigItemStub::Create(historyStatusLine));
-        root.add(WUPSConfigItemStub::Create(titleIconStatusLine));
-        char callbackLine[64];
-        std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
-                      static_cast<unsigned long>(overlayComboCallbackCount));
-        root.add(WUPSConfigItemStub::Create(callbackLine));
-        char gx2Line[64];
-        std::snprintf(gx2Line, sizeof(gx2Line), "GX2 swap hook calls: %lu",
-                      static_cast<unsigned long>(gx2SwapHookCallCount));
-        root.add(WUPSConfigItemStub::Create(gx2Line));
-        root.add(WUPSConfigItemStub::Create(gx2ContextObserved
-            ? "GX2 context state: OBSERVED"
-            : "GX2 context state: NOT OBSERVED"));
-        root.add(WUPSConfigItemStub::Create(gx2ContextSetupObserved
-            ? "GX2 context setup: OBSERVED"
-            : "GX2 context setup: NOT OBSERVED"));
-        char gx2CopyLine[96];
-        std::snprintf(gx2CopyLine, sizeof(gx2CopyLine), "Color-buffer copy hooks: %lu (TV %lu / DRC %lu)",
-                      static_cast<unsigned long>(gx2CopyHookCallCount),
-                      static_cast<unsigned long>(gx2TvCopyHookCallCount),
-                      static_cast<unsigned long>(gx2DrcCopyHookCallCount));
-        root.add(WUPSConfigItemStub::Create(gx2CopyLine));
-        char gx2BufferLine[80];
-        std::snprintf(gx2BufferLine, sizeof(gx2BufferLine), "Last color buffer: %lux%lu",
-                      static_cast<unsigned long>(gx2LastColorBufferWidth),
-                      static_cast<unsigned long>(gx2LastColorBufferHeight));
-        root.add(WUPSConfigItemStub::Create(gx2BufferLine));
-        root.add(WUPSConfigItemStub::Create("Recent titles."));
+        root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
+        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select a recent title"));
+        root.add(WUPSConfigItemStub::Create("TV + A: launch the selected title"));
+        root.add(WUPSConfigItemStub::Create("Recent titles:"));
         bool anyTitles = false;
 
         for (size_t i = 0; i < kHistoryCount; ++i) {
