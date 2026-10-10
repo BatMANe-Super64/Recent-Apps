@@ -18,9 +18,6 @@ WUPS_PLUGIN_VERSION("v0.6-alpha");
 WUPS_PLUGIN_AUTHOR("Developer");
 WUPS_PLUGIN_LICENSE("GPL-3.0");
 
-// Request the WUPS-provided OSScreen overlay helpers.
-WUPS_ALLOW_OVERLAY()
-
 namespace {
 constexpr uint64_t kHomeMenuUsa = 0x0005001010040100ULL;
 constexpr uint64_t kHomeMenuEur = 0x0005001010040200ULL;
@@ -99,42 +96,8 @@ void rememberTitle(uint64_t titleId) {
     }
 }
 
-void RecentAppsOverlayCallback(wups_overlay_options_type_t screen, void*) {
-    // Follow the WUPS overlay example: draw and flip repeatedly so the text
-    // is actually presented by OSScreen rather than only recording the combo.
-    for (uint32_t frame = 0; frame < 180; ++frame) {
-        WUPS_Overlay_OSScreenClear(screen);
-        WUPS_Overlay_PrintTextOnScreen(screen, 2, 1, "Recent Apps");
-        WUPS_Overlay_PrintTextOnScreen(screen, 2, 3, "Shortcut: TV + L");
-        WUPS_Overlay_PrintTextOnScreen(screen, 2, 5, "Recent title IDs:");
-
-        bool anyTitles = false;
-        for (size_t i = 0; i < kHistoryCount; ++i) {
-            char line[64];
-            if (recentApps[i] == 0) {
-                if (i == 0) {
-                    WUPS_Overlay_PrintTextOnScreen(screen, 2, 7,
-                                                   "No titles recorded yet.");
-                }
-                break;
-            }
-            std::snprintf(line, sizeof(line), "%02u. %016llX",
-                          static_cast<unsigned>(i + 1),
-                          static_cast<unsigned long long>(recentApps[i]));
-            WUPS_Overlay_PrintTextOnScreen(screen, 2, 7 + static_cast<int>(i), "%s", line);
-            anyTitles = true;
-        }
-        if (!anyTitles && recentApps[0] != 0) {
-            WUPS_Overlay_PrintTextOnScreen(screen, 2, 7, "No titles recorded yet.");
-        }
-        WUPS_Overlay_PrintTextOnScreen(screen, 2, 20, "Overlay test: visible");
-        WUPS_Overlay_FlipBuffers(screen);
-    }
-}
-
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     ++overlayComboCallbackCount;
-    WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, RecentAppsOverlayCallback, nullptr);
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
