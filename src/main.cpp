@@ -508,6 +508,9 @@ void MoveRecentSelection(int direction) {
         }
 
         if (recentApps[selectedRecentIndex] != 0) {
+            // Keep the decoded RGBA buffer in sync with the highlighted title.
+            // The renderer will consume this buffer when icon drawing is enabled.
+            inspectRecentTitleIcon(selectedRecentIndex);
             RefreshRecentAppsNotification();
             return;
         }
