@@ -2,6 +2,7 @@
 #include <wups/storage.h>
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemStub.h>
+#include <wups/config/WUPSConfigItemMultipleValues.h>
 #include <wups/config_api.h>
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
@@ -43,6 +44,8 @@ constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
 constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
 constexpr size_t kHistoryCount = 10;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
+constexpr char kBackgroundColorStorageId[] = "background_color";
+constexpr uint32_t kDefaultBackgroundColor = 0;
 
 uint64_t recentApps[kHistoryCount] = {};
 char recentAppNames[kHistoryCount][64] = {};
@@ -53,6 +56,7 @@ WUPSButtonCombo_ComboHandle previousComboHandle = {};
 WUPSButtonCombo_ComboHandle nextComboHandle = {};
 WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
+uint32_t backgroundColorSelection = kDefaultBackgroundColor;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
 constexpr size_t kHomeNotificationIndex = kHistoryCount;
@@ -76,6 +80,36 @@ void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
                         index + 1 == selectedRecentIndex ? '>' : ' ',
                         static_cast<unsigned>(index + 2),
                         recentAppNames[index][0] != '\0' ? recentAppNames[index] : "Unnamed title");
+}
+
+NMColor BackgroundColorForSelection(uint32_t selection) {
+    switch (selection) {
+        case 1: return NMColor{20, 20, 20, 255};
+        case 2: return NMColor{50, 50, 50, 255};
+        case 3: return NMColor{0, 90, 180, 255};
+        case 4: return NMColor{170, 30, 40, 255};
+        case 5: return NMColor{20, 120, 65, 255};
+        case 6: return NMColor{105, 45, 150, 255};
+        case 0:
+        default: return NMColor{100, 100, 100, 255};
+    }
+}
+
+void ApplyNotificationBackgroundColor() {
+    if (!notificationLibraryReady) return;
+
+    const NMColor color = BackgroundColorForSelection(backgroundColorSelection);
+    (void)NotificationModule_SetDefaultValue(
+        NOTIFICATION_MODULE_NOTIFICATION_TYPE_DYNAMIC,
+        NOTIFICATION_MODULE_DEFAULT_OPTION_BACKGROUND_COLOR,
+        color);
+
+    // Also update currently visible rows if the setting changes while the menu is open.
+    for (const NotificationModuleHandle handle : notificationHandles) {
+        if (handle != 0) {
+            (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(handle, color);
+        }
+    }
 }
 
 void HideRecentAppsNotification();
@@ -433,6 +467,14 @@ void resolveAllRecentAppNames() {
     for (size_t i = 0; i < kHistoryCount; ++i) resolveRecentAppName(i);
 }
 
+void loadBackgroundColorSetting() {
+    const WUPSStorageError error = WUPSStorageAPI::GetOrStoreDefault<uint32_t>(
+        kBackgroundColorStorageId, backgroundColorSelection, kDefaultBackgroundColor);
+    if (error != WUPS_STORAGE_ERROR_SUCCESS || backgroundColorSelection > 6) {
+        backgroundColorSelection = kDefaultBackgroundColor;
+    }
+}
+
 void loadRecentApps() {
     for (size_t i = 0; i < kHistoryCount; ++i) {
         char key[16];
@@ -619,18 +661,51 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
     SYSLaunchTitle(titleId);
 }
 
+void BackgroundColorChangedCallback(ConfigItemMultipleValues*, uint32_t newValue) {
+    backgroundColorSelection = newValue <= 6 ? newValue : kDefaultBackgroundColor;
+    ApplyNotificationBackgroundColor();
+
+    const WUPSStorageError error =
+        WUPSStorageAPI::Store(kBackgroundColorStorageId, backgroundColorSelection);
+    if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Color setting save failed: %.45s",
+                            WUPSStorageAPI::GetStatusStr(error));
+    }
+}
+
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
         root.add(WUPSConfigItemStub::Create("TV + Up/Down: select HOME or a recent title"));
         root.add(WUPSConfigItemStub::Create("TV + A: open HOME or launch the selected title"));
+
+        constexpr WUPSConfigItemMultipleValues::ValuePair backgroundColorOptions[] = {
+            {0, "Default Gray"},
+            {1, "Black"},
+            {2, "Dark Gray"},
+            {3, "Blue"},
+            {4, "Red"},
+            {5, "Green"},
+            {6, "Purple"},
+        };
+        root.add(WUPSConfigItemMultipleValues::CreateFromValue(
+            kBackgroundColorStorageId, "Background Color", kDefaultBackgroundColor,
+            backgroundColorSelection, backgroundColorOptions, &BackgroundColorChangedCallback));
     } catch (...) {
         return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
     }
     return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;
 }
-void ConfigMenuClosedCallback() {}
+void ConfigMenuClosedCallback() {
+    const WUPSStorageError error = WUPSStorageAPI::SaveStorage();
+    if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Settings save failed: %.45s",
+                            WUPSStorageAPI::GetStatusStr(error));
+    }
+}
 } // namespace
 
 
@@ -655,6 +730,7 @@ WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
 INITIALIZE_PLUGIN() {
     ACPInitialize();
     acpReady = true;
+    loadBackgroundColorSetting();
     loadRecentApps();
     resolveAllRecentAppNames();
     inspectRecentTitleIcon(0);
@@ -662,6 +738,7 @@ INITIALIZE_PLUGIN() {
     const NotificationModuleStatus notificationStatus = NotificationModule_InitLibrary();
     notificationLibraryReady = notificationStatus == NOTIFICATION_MODULE_RESULT_SUCCESS;
     if (notificationLibraryReady) {
+        ApplyNotificationBackgroundColor();
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "NotificationModule: ready");
     } else {
