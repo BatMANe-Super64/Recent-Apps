@@ -63,26 +63,15 @@ alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
 alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
-    if (bufferSize == 0) return;
-
     size_t used = 0;
     int written = std::snprintf(buffer, bufferSize, "Recent Apps");
     if (written < 0 || static_cast<size_t>(written) >= bufferSize) {
-        buffer[bufferSize - 1] = '\0';
+        if (bufferSize > 0) buffer[bufferSize - 1] = '\0';
         return;
     }
     used = static_cast<size_t>(written);
 
-    // Keep the notification to three title rows so it stays on-screen.
-    // Show the selected title with a neighboring title above and below where possible.
-    constexpr size_t kVisibleRecentTitles = 3;
-    size_t startIndex = selectedRecentIndex > 0 ? selectedRecentIndex - 1 : 0;
-    if (startIndex + kVisibleRecentTitles > kHistoryCount) {
-        startIndex = kHistoryCount - kVisibleRecentTitles;
-    }
-
-    size_t displayed = 0;
-    for (size_t i = startIndex; i < kHistoryCount && displayed < kVisibleRecentTitles; ++i) {
+    for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
         written = std::snprintf(buffer + used, bufferSize - used,
                                 "\n%c%02u. %.45s",
@@ -95,10 +84,9 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
             break;
         }
         used += static_cast<size_t>(written);
-        ++displayed;
     }
 
-    if (displayed == 0) {
+    if (used == std::strlen("Recent Apps")) {
         (void)std::snprintf(buffer + used, bufferSize - used, "\nNo titles recorded yet");
     }
 }
