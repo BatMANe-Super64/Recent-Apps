@@ -950,17 +950,25 @@ void ConfigMenuClosedCallback() {
 } // namespace
 
 
-// Prevent TV-modified D-pad navigation from also moving the HOME Menu cursor.
-// ButtonComboModule still handles the registered TV + Up/Down shortcuts.
+// Keep TV-modified shortcuts from also triggering native HOME Menu navigation.
+// The TV + L shortcut opens Recent Apps; suppress L while TV is held so it
+// cannot also turn the HOME Menu app pages. Once the overlay is visible,
+// suppress TV + Up/Down from moving the HOME Menu cursor as well.
 DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
-    if (result > 0 && buffers != nullptr && overlayVisible) {
+    if (result > 0 && buffers != nullptr) {
         for (int32_t i = 0; i < result; ++i) {
             if ((buffers[i].hold & VPAD_BUTTON_TV) != 0) {
                 constexpr uint32_t kNavigationButtons = VPAD_BUTTON_UP | VPAD_BUTTON_DOWN;
-                buffers[i].hold &= ~kNavigationButtons;
-                buffers[i].trigger &= ~kNavigationButtons;
-                buffers[i].release &= ~kNavigationButtons;
+                constexpr uint32_t kPageNavigationButton = VPAD_BUTTON_L;
+                buffers[i].hold &= ~kPageNavigationButton;
+                buffers[i].trigger &= ~kPageNavigationButton;
+                buffers[i].release &= ~kPageNavigationButton;
+                if (overlayVisible) {
+                    buffers[i].hold &= ~kNavigationButtons;
+                    buffers[i].trigger &= ~kNavigationButtons;
+                    buffers[i].release &= ~kNavigationButtons;
+                }
             }
         }
     }
