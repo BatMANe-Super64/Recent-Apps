@@ -146,22 +146,20 @@ NMColor BackgroundColorForSelection(uint32_t selection) {
 void ApplyNotificationBackgroundColor() {
     if (!notificationLibraryReady) return;
 
-    const NMColor globalColor = BackgroundColorForSelection(backgroundColorSelection);
-    (void)NotificationModule_SetDefaultValue(
-        NOTIFICATION_MODULE_NOTIFICATION_TYPE_DYNAMIC,
-        NOTIFICATION_MODULE_DEFAULT_OPTION_BACKGROUND_COLOR,
-        globalColor);
-
-    // App rows use their numbered slot's color; HOME and the header use the global color.
+    // Leave NotificationModule's native styling untouched for Standard Notifications.
+    // Only set a background explicitly when the global or slot setting is a custom color.
     for (size_t i = 0; i < (sizeof(notificationHandles) / sizeof(notificationHandles[0])); ++i) {
         const NotificationModuleHandle handle = notificationHandles[i];
         if (handle == 0) continue;
 
-        const uint32_t selection = i < kHistoryCount
+        const uint32_t slotSelection = i < kHistoryCount
             ? slotBackgroundColorSelections[i] : kUseGlobalBackgroundColor;
-        const NMColor color = selection == kUseGlobalBackgroundColor
-            ? globalColor : BackgroundColorForSelection(selection);
-        (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(handle, color);
+        const uint32_t selection = slotSelection == kUseGlobalBackgroundColor
+            ? backgroundColorSelection : slotSelection;
+        if (selection == kDefaultBackgroundColor) continue;
+
+        (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(
+            handle, BackgroundColorForSelection(selection));
     }
 }
 
@@ -810,7 +808,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create("TV + A: open HOME or launch the selected title"));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair backgroundColorOptions[] = {
-            {0, "Default Gray"},
+            {0, "Standard Notifications"},
             {1, "Black"},
             {2, "Charcoal"},
             {3, "Dark Gray"},
