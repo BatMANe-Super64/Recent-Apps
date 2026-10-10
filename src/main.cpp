@@ -11,6 +11,7 @@
 #include <vpad/input.h>
 #include <notifications/notifications.h>
 #include <gx2/swap.h>
+#include <gx2/surface.h>
 #include <gx2/context.h>
 
 #include <cstdint>
