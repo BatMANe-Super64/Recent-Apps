@@ -219,6 +219,8 @@ void ShowRecentAppsNotification() {
         return;
     }
 
+    ApplyNotificationBackgroundColor();
+
     (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                         "NotificationModule: display requested");
 }
