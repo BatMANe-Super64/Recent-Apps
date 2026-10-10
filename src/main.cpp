@@ -20,7 +20,7 @@ constexpr uint64_t kHomeMenuUsa = 0x0005001010040100ULL;
 constexpr uint64_t kHomeMenuEur = 0x0005001010040200ULL;
 constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
 constexpr char kHistoryPath[] = "/vol/external01/wiiu/plugins/recent-apps.dat";
-constexpr uint32_t kHistoryMagic = 0x52415050; // "RAPP"
+constexpr uint32_t kHistoryMagic = 0x52415050;
 constexpr uint32_t kHistoryVersion = 1;
 constexpr size_t kHistoryCount = 10;
 
@@ -42,21 +42,17 @@ bool isHomeMenuTitle(uint64_t titleId) {
 
 void loadRecentApps() {
     FILE* file = std::fopen(kHistoryPath, "rb");
-    if (file == nullptr) {
-        return;
-    }
+    if (file == nullptr) return;
 
     HistoryFile history = {};
     const size_t bytesRead = std::fread(&history, 1, sizeof(history), file);
     std::fclose(file);
 
-    if (bytesRead != sizeof(history) ||
-        history.magic != kHistoryMagic ||
-        history.version != kHistoryVersion) {
-        return;
+    if (bytesRead == sizeof(history) &&
+        history.magic == kHistoryMagic &&
+        history.version == kHistoryVersion) {
+        std::memcpy(recentApps, history.titleIds, sizeof(recentApps));
     }
-
-    std::memcpy(recentApps, history.titleIds, sizeof(recentApps));
 }
 
 void saveRecentApps() {
@@ -66,28 +62,20 @@ void saveRecentApps() {
     std::memcpy(history.titleIds, recentApps, sizeof(recentApps));
 
     FILE* file = std::fopen(kHistoryPath, "wb");
-    if (file == nullptr) {
-        return;
-    }
-
-    const size_t bytesWritten = std::fwrite(&history, 1, sizeof(history), file);
+    if (file == nullptr) return;
+    (void)std::fwrite(&history, 1, sizeof(history), file);
     std::fclose(file);
-    (void)bytesWritten;
 }
 
 void rememberTitle(uint64_t titleId) {
-    if (titleId == 0 || isHomeMenuTitle(titleId)) {
-        return;
-    }
+    if (titleId == 0 || isHomeMenuTitle(titleId)) return;
 
     uint64_t updated[kHistoryCount] = {};
     updated[0] = titleId;
     size_t next = 1;
 
     for (size_t i = 0; i < kHistoryCount && next < kHistoryCount; ++i) {
-        if (recentApps[i] == 0 || recentApps[i] == titleId) {
-            continue;
-        }
+        if (recentApps[i] == 0 || recentApps[i] == titleId) continue;
         updated[next++] = recentApps[i];
     }
 
@@ -96,8 +84,40 @@ void rememberTitle(uint64_t titleId) {
         saveRecentApps();
     }
 }
+} // namespace
 
-void drawRecentAppsOverlay(wups_overlay_options_type_t screen, void*) {
+void drawRecentAppsOverlay(wups_overlay_options_type_t screen, void* args);
+
+INITIALIZE_PLUGIN() {
+    loadRecentApps();
+}
+
+ON_APPLICATION_START() {
+    rememberTitle(OSGetTitleID());
+}
+
+DECL_FUNCTION(int32_t, VPADRead, int32_t chan, VPADStatus* buffer,
+              uint32_t buffer_size, int32_t* error) {
+    const int32_t result = real_VPADRead(chan, buffer, buffer_size, error);
+
+    if (result > 0 && buffer != nullptr && chan == 0) {
+        if (overlayCooldown > 0) --overlayCooldown;
+
+        if (isHomeMenuTitle(OSGetTitleID()) &&
+            (buffer[0].trigger & VPAD_BUTTON_MINUS) &&
+            overlayCooldown == 0) {
+            overlayCooldown = 30;
+            WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, drawRecentAppsOverlay, nullptr);
+        }
+    }
+
+    return result;
+}
+
+WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
+
+void drawRecentAppsOverlay(wups_overlay_options_type_t screen, void* args) {
+    (void)args;
     bool running = true;
 
     while (running) {
@@ -108,10 +128,7 @@ void drawRecentAppsOverlay(wups_overlay_options_type_t screen, void*) {
 
         bool hasApps = false;
         for (size_t i = 0; i < kHistoryCount; ++i) {
-            if (recentApps[i] != 0) {
-                hasApps = true;
-                break;
-            }
+            if (recentApps[i] != 0) { hasApps = true; break; }
         }
 
         if (!hasApps) {
@@ -151,34 +168,3 @@ void drawRecentAppsOverlay(wups_overlay_options_type_t screen, void*) {
         }
     }
 }
-} // namespace
-
-INITIALIZE_PLUGIN() {
-    loadRecentApps();
-}
-
-ON_APPLICATION_START() {
-    rememberTitle(OSGetTitleID());
-}
-
-DECL_FUNCTION(int32_t, VPADRead, int32_t chan, VPADStatus* buffer,
-              uint32_t buffer_size, int32_t* error) {
-    const int32_t result = real_VPADRead(chan, buffer, buffer_size, error);
-
-    if (result > 0 && buffer != nullptr && chan == 0) {
-        if (overlayCooldown > 0) {
-            --overlayCooldown;
-        }
-
-        if (isHomeMenuTitle(OSGetTitleID()) &&
-            (buffer[0].trigger & VPAD_BUTTON_MINUS) &&
-            overlayCooldown == 0) {
-            overlayCooldown = 30;
-            WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, drawRecentAppsOverlay, nullptr);
-        }
-    }
-
-    return result;
-}
-
-WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
