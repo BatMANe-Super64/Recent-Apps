@@ -55,18 +55,26 @@ WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
-NotificationModuleHandle notificationHandles[kHistoryCount + 1] = {};
+constexpr size_t kHomeNotificationIndex = kHistoryCount;
+constexpr size_t kHeaderNotificationIndex = kHistoryCount + 1;
+NotificationModuleHandle notificationHandles[kHistoryCount + 2] = {};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
 char historyStatusLine[96] = "History: not checked";
 char titleIconStatusLine[128] = "Title icons: not checked";
 alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
 alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
+void BuildHomeMenuLine(char* buffer, size_t bufferSize) {
+    if (bufferSize == 0) return;
+    (void)std::snprintf(buffer, bufferSize, "%c01. HOME",
+                        selectedRecentIndex == 0 ? '>' : ' ');
+}
+
 void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
     if (bufferSize == 0 || index >= kHistoryCount) return;
     (void)std::snprintf(buffer, bufferSize, "%c%02u. %.45s",
-                        index == selectedRecentIndex ? '>' : ' ',
-                        static_cast<unsigned>(index + 1),
+                        index + 1 == selectedRecentIndex ? '>' : ' ',
+                        static_cast<unsigned>(index + 2),
                         recentAppNames[index][0] != '\0' ? recentAppNames[index] : "Unnamed title");
 }
 
@@ -104,19 +112,19 @@ void ShowRecentAppsNotification() {
         }
     }
 
-    if (!hasTitles) {
-        const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
-            "No titles recorded yet", &notificationHandles[0]);
-        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
-            HideRecentAppsNotification();
-            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                                "Notification failed: %s", NotificationModule_GetStatusStr(status));
-            return;
-        }
+    char homeText[32];
+    BuildHomeMenuLine(homeText, sizeof(homeText));
+    const NotificationModuleStatus homeStatus = NotificationModule_AddDynamicNotification(
+        homeText, &notificationHandles[kHomeNotificationIndex]);
+    if (homeStatus != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+        HideRecentAppsNotification();
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Notification failed: %s", NotificationModule_GetStatusStr(homeStatus));
+        return;
     }
 
     const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
-        "Recent Apps", &notificationHandles[kHistoryCount]);
+        "Recent Apps", &notificationHandles[kHeaderNotificationIndex]);
     if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
         HideRecentAppsNotification();
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
@@ -152,13 +160,26 @@ void HideRecentAppsNotification() {
         delay += kNotificationExitStaggerSeconds;
     }
 
-    // Keep the header until the title rows have started to leave.
-    const NotificationModuleHandle headerHandle = notificationHandles[kHistoryCount];
+    const NotificationModuleHandle homeHandle = notificationHandles[kHomeNotificationIndex];
+    if (homeHandle != 0) {
+        hadNotifications = true;
+        const NotificationModuleStatus status =
+            NotificationModule_FinishDynamicNotification(homeHandle, delay);
+        notificationHandles[kHomeNotificationIndex] = 0;
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification close failed: %s", NotificationModule_GetStatusStr(status));
+        }
+        delay += kNotificationExitStaggerSeconds;
+    }
+
+    // Keep the header until all rows have started to leave.
+    const NotificationModuleHandle headerHandle = notificationHandles[kHeaderNotificationIndex];
     if (headerHandle != 0) {
         hadNotifications = true;
         const NotificationModuleStatus status =
             NotificationModule_FinishDynamicNotification(headerHandle, delay);
-        notificationHandles[kHistoryCount] = 0;
+        notificationHandles[kHeaderNotificationIndex] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
@@ -508,7 +529,6 @@ void RefreshRecentAppsNotification() {
         const NotificationModuleStatus status =
             NotificationModule_UpdateDynamicNotificationText(notificationHandles[i], text);
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
-            // Recreate the stacked rows if a notification handle has gone stale.
             HideRecentAppsNotification();
             ShowRecentAppsNotification();
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
@@ -517,22 +537,41 @@ void RefreshRecentAppsNotification() {
             return;
         }
     }
+
+    if (notificationHandles[kHomeNotificationIndex] != 0) {
+        char homeText[32];
+        BuildHomeMenuLine(homeText, sizeof(homeText));
+        const NotificationModuleStatus status =
+            NotificationModule_UpdateDynamicNotificationText(notificationHandles[kHomeNotificationIndex], homeText);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            HideRecentAppsNotification();
+            ShowRecentAppsNotification();
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification update fallback: %s",
+                                NotificationModule_GetStatusStr(status));
+        }
+    }
 }
 
 void MoveRecentSelection(int direction) {
     if (!overlayVisible) return;
 
-    for (size_t attempt = 0; attempt < kHistoryCount; ++attempt) {
+    const size_t menuEntryCount = kHistoryCount + 1;
+    for (size_t attempt = 0; attempt < menuEntryCount; ++attempt) {
         if (direction > 0) {
-            selectedRecentIndex = (selectedRecentIndex + 1) % kHistoryCount;
+            selectedRecentIndex = (selectedRecentIndex + 1) % menuEntryCount;
         } else {
-            selectedRecentIndex = (selectedRecentIndex + kHistoryCount - 1) % kHistoryCount;
+            selectedRecentIndex = (selectedRecentIndex + menuEntryCount - 1) % menuEntryCount;
         }
 
-        if (recentApps[selectedRecentIndex] != 0) {
-            // Keep the decoded RGBA buffer in sync with the highlighted title.
-            // The renderer will consume this buffer when icon drawing is enabled.
-            inspectRecentTitleIcon(selectedRecentIndex);
+        if (selectedRecentIndex == 0) {
+            RefreshRecentAppsNotification();
+            return;
+        }
+
+        const size_t titleIndex = selectedRecentIndex - 1;
+        if (recentApps[titleIndex] != 0) {
+            inspectRecentTitleIcon(titleIndex);
             RefreshRecentAppsNotification();
             return;
         }
@@ -550,7 +589,16 @@ void RecentAppsNextCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Com
 void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     if (!overlayVisible) return;
 
-    const uint64_t titleId = recentApps[selectedRecentIndex];
+    if (selectedRecentIndex == 0) {
+        HideRecentAppsNotification();
+        overlayVisible = false;
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Returning to HOME Menu");
+        SYSLaunchMenu();
+        return;
+    }
+
+    const uint64_t titleId = recentApps[selectedRecentIndex - 1];
     if (titleId == 0) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "Launch skipped: no title selected");
@@ -575,8 +623,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
     try {
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
-        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select a recent title"));
-        root.add(WUPSConfigItemStub::Create("TV + A: launch the selected title"));
+        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select HOME or a recent title"));
+        root.add(WUPSConfigItemStub::Create("TV + A: open HOME or launch the selected title"));
     } catch (...) {
         return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
     }
