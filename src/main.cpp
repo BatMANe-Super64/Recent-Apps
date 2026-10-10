@@ -192,9 +192,7 @@ void inspectRecentTitleIcon(size_t index) {
     const uint32_t titleHigh = static_cast<uint32_t>(titleId >> 32);
     const uint32_t titleLow = static_cast<uint32_t>(titleId & 0xFFFFFFFFULL);
 
-    // ACP's metadata directory can be valid without being accessible through
-    // the path returned on every firmware. Try the known installed-title
-    // locations on both internal storage and USB as well.
+    // Check both known installed-title locations and ACP's metadata directory.
     char candidatePaths[3][320] = {};
     std::snprintf(candidatePaths[0], sizeof(candidatePaths[0]),
                   "/vol/storage_mlc01/usr/title/%08X/%08X/meta/iconTex.tga",
@@ -217,14 +215,34 @@ void inspectRecentTitleIcon(size_t index) {
     for (const char* path : candidatePaths) {
         if (path[0] == '\0') continue;
         struct stat info = {};
-        if (stat(path, &info) == 0 && info.st_size > 18) {
-            const char* location = std::strstr(path, "storage_usb01") != nullptr
-                ? "USB" : (std::strstr(path, "storage_mlc01") != nullptr ? "MLC" : "ACP");
-            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                          "Title icon found on %s (%lu bytes)", location,
-                          static_cast<unsigned long>(info.st_size));
-            return;
-        }
+        if (stat(path, &info) != 0 || info.st_size < 18) continue;
+
+        FILE* iconFile = std::fopen(path, "rb");
+        if (iconFile == nullptr) continue;
+
+        // TGA dimensions and pixel depth are stored in the 18-byte header.
+        uint8_t header[18] = {};
+        const size_t bytesRead = std::fread(header, 1, sizeof(header), iconFile);
+        std::fclose(iconFile);
+        if (bytesRead != sizeof(header)) continue;
+
+        const uint16_t width = static_cast<uint16_t>(header[12]) |
+                               (static_cast<uint16_t>(header[13]) << 8);
+        const uint16_t height = static_cast<uint16_t>(header[14]) |
+                                (static_cast<uint16_t>(header[15]) << 8);
+        const uint8_t imageType = header[2];
+        const uint8_t pixelDepth = header[16];
+        const char* location = std::strstr(path, "storage_usb01") != nullptr
+            ? "USB" : (std::strstr(path, "storage_mlc01") != nullptr ? "MLC" : "ACP");
+
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Icon %s: %ux%u, %u-bit TGA type %u, %lu B",
+                      location, static_cast<unsigned>(width),
+                      static_cast<unsigned>(height),
+                      static_cast<unsigned>(pixelDepth),
+                      static_cast<unsigned>(imageType),
+                      static_cast<unsigned long>(info.st_size));
+        return;
     }
 
     std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
