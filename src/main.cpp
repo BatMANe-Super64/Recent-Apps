@@ -19,6 +19,7 @@
 #include <atomic>
 
 WUPS_USE_WUT_DEVOPTAB();
+WUPS_FS_ACCESS();
 
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps")
 WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
@@ -33,6 +34,9 @@ constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
 constexpr uint64_t kHomeMenuKor = 0x0005001010040300ULL;
 constexpr uint64_t kHomeMenuTwn = 0x0005001010040400ULL;
 constexpr uint64_t kHomeMenuChn = 0x0005001010040500ULL;
+constexpr uint64_t kHealthSafetyJpn = 0x000500101004E000ULL;
+constexpr uint64_t kHealthSafetyUsa = 0x000500101004E100ULL;
+constexpr uint64_t kHealthSafetyEur = 0x000500101004E200ULL;
 // Keep history in an existing SD directory so it survives title changes/reboots.
 constexpr char kHistoryPath[] = "sd:/wiiu/recent-apps.dat";
 constexpr uint32_t kHistoryMagic = 0x52415050;
@@ -64,6 +68,7 @@ bool overlayVisible = false;
 bool notificationLibraryReady = false;
 std::atomic<NotificationModuleHandle> notificationHandle{0};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
+char historyStatusLine[96] = "History: not checked";
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     size_t used = 0;
@@ -139,12 +144,19 @@ bool isHomeMenuTitle(uint64_t titleId) {
            titleId == kHomeMenuJpn ||
            titleId == kHomeMenuKor ||
            titleId == kHomeMenuTwn ||
-           titleId == kHomeMenuChn;
+           titleId == kHomeMenuChn ||
+           titleId == kHealthSafetyJpn ||
+           titleId == kHealthSafetyUsa ||
+           titleId == kHealthSafetyEur;
 }
 
 void loadRecentApps() {
     FILE* file = std::fopen(kHistoryPath, "rb");
-    if (file == nullptr) return;
+    if (file == nullptr) {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: no saved file yet");
+        return;
+    }
 
     HistoryFile history = {};
     const size_t bytesRead = std::fread(&history, 1, sizeof(history), file);
@@ -154,6 +166,11 @@ void loadRecentApps() {
         history.magic == kHistoryMagic &&
         history.version == kHistoryVersion) {
         std::memcpy(recentApps, history.titleIds, sizeof(recentApps));
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: loaded from SD");
+    } else {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: saved file invalid");
     }
 }
 
@@ -164,9 +181,20 @@ void saveRecentApps() {
     std::memcpy(history.titleIds, recentApps, sizeof(recentApps));
 
     FILE* file = std::fopen(kHistoryPath, "wb");
-    if (file == nullptr) return;
-    (void)std::fwrite(&history, 1, sizeof(history), file);
-    std::fclose(file);
+    if (file == nullptr) {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: SD save open failed");
+        return;
+    }
+    const size_t bytesWritten = std::fwrite(&history, 1, sizeof(history), file);
+    const int closeResult = std::fclose(file);
+    if (bytesWritten == sizeof(history) && closeResult == 0) {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: saved to SD");
+    } else {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: SD write failed");
+    }
 }
 
 void rememberTitle(uint64_t titleId) {
@@ -281,6 +309,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create(overlayVisible ? "Recent Apps notification: ON (TV + L toggles)" : "Recent Apps notification: OFF (TV + L toggles)"));
         root.add(WUPSConfigItemStub::Create("TV + Up/Down: select recent title; TV + A: launch selection"));
         root.add(WUPSConfigItemStub::Create(notificationStatusLine));
+        root.add(WUPSConfigItemStub::Create(historyStatusLine));
         char callbackLine[64];
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
@@ -472,7 +501,12 @@ DEINITIALIZE_PLUGIN() {
     }
 }
 
-ON_APPLICATION_START() {
+ON_APPLICATION_START(args) {
+    if (!args.sd_mounted) {
+        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                            "History: SD not mounted");
+        return;
+    }
     rememberTitle(OSGetTitleID());
 }
 
