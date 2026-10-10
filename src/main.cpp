@@ -11,13 +11,12 @@
 #include <string>
 
 WUPS_USE_WUT_DEVOPTAB();
-WUPS_ALLOW_OVERLAY()
 
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps")
-WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.")
-WUPS_PLUGIN_VERSION("v0.6-alpha")
-WUPS_PLUGIN_AUTHOR("Developer")
-WUPS_PLUGIN_LICENSE("GPL-3.0")
+WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
+WUPS_PLUGIN_VERSION("v0.6-alpha");
+WUPS_PLUGIN_AUTHOR("Developer");
+WUPS_PLUGIN_LICENSE("GPL-3.0");
 
 namespace {
 constexpr uint64_t kHomeMenuUsa = 0x0005001010040100ULL;
