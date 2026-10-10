@@ -47,6 +47,7 @@ char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 uint32_t overlayComboCallbackCount = 0;
 uint32_t gx2SwapHookCallCount = 0;
 bool gx2ContextObserved = false;
+bool gx2ContextSetupObserved = false;
 bool colorShaderInitAttempted = false;
 bool colorShaderInitSucceeded = false;
 bool overlayVisible = false;
@@ -127,6 +128,9 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create(gx2ContextObserved
             ? "GX2 context state: OBSERVED"
             : "GX2 context state: NOT OBSERVED"));
+        root.add(WUPSConfigItemStub::Create(gx2ContextSetupObserved
+            ? "GX2 context setup: OBSERVED"
+            : "GX2 context setup: NOT OBSERVED"));
         root.add(WUPSConfigItemStub::Create(colorShaderInitAttempted
             ? (colorShaderInitSucceeded ? "Shader initialization: OK" : "Shader initialization: FAILED")
             : "Shader initialization: NOT TESTED"));
@@ -177,6 +181,13 @@ DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
     real_GX2SetContextState(state);
 }
 WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
+
+// Fourth diagnostic: observe context setup without altering the requested operation.
+DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
+    real_GX2SetupContextStateEx(state, enable);
+    if (state != nullptr) gx2ContextSetupObserved = true;
+}
+WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
 
 // Second diagnostic: observe scan-buffer swaps without changing rendering state.
 DECL_FUNCTION(void, GX2SwapScanBuffers) {
