@@ -52,9 +52,6 @@ WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 WUPSButtonCombo_ComboHandle previousComboHandle = {};
 WUPSButtonCombo_ComboHandle nextComboHandle = {};
 WUPSButtonCombo_ComboHandle launchComboHandle = {};
-char comboRegistrationLine[128] = "Shortcut registration: not initialized";
-char navigationRegistrationLine[128] = "Navigation shortcuts: not initialized";
-char launchRegistrationLine[96] = "Launch shortcut: not initialized";
 size_t selectedRecentIndex = 0;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
@@ -616,10 +613,8 @@ INITIALIZE_PLUGIN() {
         nullptr,
         &overlayComboHandle,
         &comboStatus);
-    std::snprintf(comboRegistrationLine, sizeof(comboRegistrationLine),
-                  "TV + L: %s / %s",
-                  WUPSButtonComboAPI_GetStatusStr(comboError),
-                  WUPSButtonComboAPI_GetComboStatusStr(comboStatus));
+    (void)comboError;
+    (void)comboStatus;
 
     WUPSButtonCombo_ComboStatus previousStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
     const WUPSButtonCombo_Error previousError = WUPSButtonComboAPI_AddButtonComboPressDown(
@@ -639,12 +634,10 @@ INITIALIZE_PLUGIN() {
         &nextComboHandle,
         &nextStatus);
 
-    std::snprintf(navigationRegistrationLine, sizeof(navigationRegistrationLine),
-                  "TV + Up: %s/%s; Down: %s/%s",
-                  WUPSButtonComboAPI_GetStatusStr(previousError),
-                  WUPSButtonComboAPI_GetComboStatusStr(previousStatus),
-                  WUPSButtonComboAPI_GetStatusStr(nextError),
-                  WUPSButtonComboAPI_GetComboStatusStr(nextStatus));
+    (void)previousError;
+    (void)previousStatus;
+    (void)nextError;
+    (void)nextStatus;
 
     WUPSButtonCombo_ComboStatus launchStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
     const WUPSButtonCombo_Error launchError = WUPSButtonComboAPI_AddButtonComboPressDown(
@@ -655,10 +648,8 @@ INITIALIZE_PLUGIN() {
         &launchComboHandle,
         &launchStatus);
 
-    std::snprintf(launchRegistrationLine, sizeof(launchRegistrationLine),
-                  "TV + A: %s / %s",
-                  WUPSButtonComboAPI_GetStatusStr(launchError),
-                  WUPSButtonComboAPI_GetComboStatusStr(launchStatus));
+    (void)launchError;
+    (void)launchStatus;
 
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent Apps"};
     (void)WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
