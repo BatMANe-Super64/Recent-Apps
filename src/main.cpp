@@ -21,7 +21,11 @@ namespace {
 constexpr uint64_t kHomeMenuUsa = 0x0005001010040100ULL;
 constexpr uint64_t kHomeMenuEur = 0x0005001010040200ULL;
 constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
-constexpr char kHistoryPath[] = "/vol/external01/wiiu/plugins/recent-apps.dat";
+constexpr uint64_t kHomeMenuKor = 0x0005001010040300ULL;
+constexpr uint64_t kHomeMenuTwn = 0x0005001010040400ULL;
+constexpr uint64_t kHomeMenuChn = 0x0005001010040500ULL;
+// Keep history in an existing SD directory so it survives title changes/reboots.
+constexpr char kHistoryPath[] = "sd:/wiiu/recent-apps.dat";
 constexpr uint32_t kHistoryMagic = 0x52415050;
 constexpr uint32_t kHistoryVersion = 1;
 constexpr size_t kHistoryCount = 10;
@@ -37,7 +41,10 @@ uint64_t recentApps[kHistoryCount] = {};
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
            titleId == kHomeMenuEur ||
-           titleId == kHomeMenuJpn;
+           titleId == kHomeMenuJpn ||
+           titleId == kHomeMenuKor ||
+           titleId == kHomeMenuTwn ||
+           titleId == kHomeMenuChn;
 }
 
 void loadRecentApps() {
@@ -88,13 +95,13 @@ void rememberTitle(uint64_t titleId) {
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
-        root.add(WUPSConfigItemStub::Create("Most recent titles are listed below."));
+        root.add(WUPSConfigItemStub::Create("Recent titles (newest first; history saved to SD)."));
         bool anyTitles = false;
 
         for (size_t i = 0; i < kHistoryCount; ++i) {
             char line[64];
             if (recentApps[i] == 0) {
-                std::snprintf(line, sizeof(line), "%02u. (empty)",
+                std::snprintf(line, sizeof(line), "%02u. (not recorded yet)",
                               static_cast<unsigned>(i + 1));
             } else {
                 std::snprintf(line, sizeof(line), "%02u. Title ID %016llX",
@@ -106,7 +113,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         }
 
         if (!anyTitles) {
-            root.add(WUPSConfigItemStub::Create("Launch a game or app to start recording history."));
+            root.add(WUPSConfigItemStub::Create("Launch a game/app; each distinct title fills one slot."));
         }
     } catch (...) {
         return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
