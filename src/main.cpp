@@ -1,7 +1,6 @@
 #include <wups.h>
 #include <coreinit/screen.h>
 #include <vpad/input.h>
-#include <sysapp/title.h>
 
 // WUPS plugin metadata.
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps");
@@ -35,10 +34,11 @@ int currentCenterIndex = 2;
 bool isMenuOverlayOpen = false;
 
 bool isUserOnHomeMenu() {
-    const uint64_t activeTitleID = SYSGetActiveTitleId();
-    return activeTitleID == WIIU_HOME_MENU_USA ||
-           activeTitleID == WIIU_HOME_MENU_EUR ||
-           activeTitleID == WIIU_HOME_MENU_JPN;
+    // TODO: Implement this using a supported WUPS app-status hook or a
+    // verified WUT API. SYSGetActiveTitleId() is not declared by the current
+    // toolchain, and SYSGetCallerTitleId() is not an equivalent replacement.
+    // Keep the overlay disabled until reliable Home Menu detection exists.
+    return false;
 }
 
 void drawHeroBackgroundWallpaper(uint64_t titleID) {
@@ -91,7 +91,5 @@ void renderKioskOverlay() {
     }
 }
 
-// Entry point. Hook installation and app-history tracking are not implemented yet.
-extern "C" WUPSInitResult WUPSPluginInit() {
-    return WUPS_INIT_RESULT_SUCCESS;
-}
+// WUPS plugin metadata is declared above. Hooks, app-history tracking, and
+// a supported Home Menu detection mechanism are not implemented yet.
