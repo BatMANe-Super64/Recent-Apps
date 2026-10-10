@@ -5,6 +5,7 @@
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
 #include <coreinit/cache.h>
+#include <gx2/swap.h>
 
 #include <cstdint>
 #include <cstdio>
@@ -141,6 +142,13 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 
 void ConfigMenuClosedCallback() {}
 } // namespace
+
+
+// Diagnostic step: verify this GX2 hook is safe before restoring any drawing.
+DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
+    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
+}
+WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
 
 INITIALIZE_PLUGIN() {
     loadRecentApps();
