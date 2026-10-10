@@ -26,7 +26,7 @@ WUPS_USE_STORAGE("recent_apps_history");
 WUPS_PLUGIN_NAME("Recent App Menu")
 WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
 WUPS_PLUGIN_VERSION("v0.6-alpha");
-WUPS_PLUGIN_AUTHOR("Developer");
+WUPS_PLUGIN_AUTHOR("Super64");
 WUPS_PLUGIN_LICENSE("GPL-3.0");
 
 namespace {
