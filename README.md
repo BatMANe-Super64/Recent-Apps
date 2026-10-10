@@ -11,8 +11,6 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list o
 - Lets you move through recorded titles and launch the selected title.
 - Avoids recording the HOME Menu and filters Health and Safety from automatic startup history.
 
-The current interface uses NotificationModule notifications. **Title icons are not displayed**; icon rendering is not required for the recent-title list and launch controls to work.
-
 ## Controls
 
 Use the TV button together with:
