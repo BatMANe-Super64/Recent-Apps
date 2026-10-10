@@ -330,7 +330,7 @@ void ConfigMenuClosedCallback() {}
 
 // Prevent TV-modified D-pad navigation from also moving the HOME Menu cursor.
 // ButtonComboModule still handles the registered TV + Up/Down shortcuts.
-DECL_FUNCTION(int32_t, VPADRead, int32_t chan, VPADStatus* buffers, uint32_t count, int32_t* error) {
+DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
     if (result > 0 && buffers != nullptr && overlayVisible) {
         for (int32_t i = 0; i < result; ++i) {
