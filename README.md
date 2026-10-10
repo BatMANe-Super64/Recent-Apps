@@ -45,4 +45,6 @@ This repository is currently a scaffold, not a functional recent-apps switcher. 
 Licensed under GNU GPL v3.0. See [LICENSE](LICENSE).
 
 
-Recent titles (newest first; history saved to SD).
+## Recent-title history
+
+Recent titles are listed newest first, and history is saved to the SD card.
