@@ -5,6 +5,7 @@
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
 #include <coreinit/cache.h>
+#include <notifications/notifications.h>
 #include <gx2/swap.h>
 #include <gx2/context.h>
 #include "shaders/ColorShader.h"
@@ -13,6 +14,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <atomic>
 
 WUPS_USE_WUT_DEVOPTAB();
 
@@ -51,6 +53,82 @@ bool gx2ContextSetupObserved = false;
 bool colorShaderInitAttempted = false;
 bool colorShaderInitSucceeded = false;
 bool overlayVisible = false;
+bool notificationLibraryReady = false;
+std::atomic<NotificationModuleHandle> notificationHandle{0};
+char notificationStatusLine[96] = "NotificationModule: not initialized";
+
+void OnNotificationFinished(NotificationModuleHandle handle, void*) {
+    if (notificationHandle.load() == handle) {
+        notificationHandle.store(0);
+    }
+}
+
+void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
+    size_t used = 0;
+    int written = std::snprintf(buffer, bufferSize, "Recent Apps");
+    if (written < 0 || static_cast<size_t>(written) >= bufferSize) {
+        if (bufferSize > 0) buffer[bufferSize - 1] = '\\0';
+        return;
+    }
+    used = static_cast<size_t>(written);
+
+    for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
+        if (recentApps[i] == 0) continue;
+        written = std::snprintf(buffer + used, bufferSize - used,
+                                "\\n%02u. %016llX",
+                                static_cast<unsigned>(i + 1),
+                                static_cast<unsigned long long>(recentApps[i]));
+        if (written < 0) break;
+        if (static_cast<size_t>(written) >= bufferSize - used) {
+            buffer[bufferSize - 1] = '\\0';
+            break;
+        }
+        used += static_cast<size_t>(written);
+    }
+
+    if (used == std::strlen("Recent Apps")) {
+        (void)std::snprintf(buffer + used, bufferSize - used, "\\nNo titles recorded yet");
+    }
+}
+
+void ShowRecentAppsNotification() {
+    if (!notificationLibraryReady) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "NotificationModule: unavailable");
+        return;
+    }
+
+    char text[256];
+    BuildRecentAppsNotification(text, sizeof(text));
+
+    NotificationModuleHandle handle = 0;
+    const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
+        text, &handle);
+    if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Notification failed: %s", NotificationModule_GetStatusStr(status));
+        return;
+    }
+
+    notificationHandle.store(handle);
+    (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                        "NotificationModule: display requested");
+}
+
+void HideRecentAppsNotification() {
+    const NotificationModuleHandle handle = notificationHandle.load();
+    if (!notificationLibraryReady || handle == 0) return;
+
+    const NotificationModuleStatus status = NotificationModule_FinishDynamicNotification(handle, 0.0f);
+    if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "Notification close failed: %s", NotificationModule_GetStatusStr(status));
+    } else {
+        notificationHandle.store(0);
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "NotificationModule: hidden");
+    }
+}
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -109,6 +187,11 @@ void rememberTitle(uint64_t titleId) {
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     ++overlayComboCallbackCount;
     overlayVisible = !overlayVisible;
+    if (overlayVisible) {
+        ShowRecentAppsNotification();
+    } else {
+        HideRecentAppsNotification();
+    }
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
@@ -116,7 +199,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         WUPSConfigCategory root(rootHandle);
         root.add(WUPSConfigItemStub::Create("Overlay shortcut diagnostics:"));
         root.add(WUPSConfigItemStub::Create(comboRegistrationLine));
-        root.add(WUPSConfigItemStub::Create(overlayVisible ? "Test panel: ON (TV + L toggles)" : "Test panel: OFF (TV + L toggles)"));
+        root.add(WUPSConfigItemStub::Create(overlayVisible ? "Recent Apps notification: ON (TV + L toggles)" : "Recent Apps notification: OFF (TV + L toggles)"));
+        root.add(WUPSConfigItemStub::Create(notificationStatusLine));
         char callbackLine[64];
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
@@ -199,6 +283,17 @@ WUPS_MUST_REPLACE(GX2SwapScanBuffers, WUPS_LOADER_LIBRARY_GX2, GX2SwapScanBuffer
 INITIALIZE_PLUGIN() {
     loadRecentApps();
 
+    const NotificationModuleStatus notificationStatus = NotificationModule_InitLibrary();
+    notificationLibraryReady = notificationStatus == NOTIFICATION_MODULE_RESULT_SUCCESS;
+    if (notificationLibraryReady) {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "NotificationModule: ready");
+    } else {
+        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                            "NotificationModule unavailable: %s",
+                            NotificationModule_GetStatusStr(notificationStatus));
+    }
+
     WUPSButtonCombo_ComboStatus comboStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
     const WUPSButtonCombo_Error comboError = WUPSButtonComboAPI_AddButtonComboPressDown(
         "Recent Apps overlay (TV + L)",
@@ -217,6 +312,11 @@ INITIALIZE_PLUGIN() {
 }
 
 DEINITIALIZE_PLUGIN() {
+    HideRecentAppsNotification();
+    if (notificationLibraryReady) {
+        (void)NotificationModule_DeInitLibrary();
+        notificationLibraryReady = false;
+    }
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
