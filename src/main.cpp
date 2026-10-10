@@ -43,6 +43,7 @@ uint64_t recentApps[kHistoryCount] = {};
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 uint32_t overlayComboCallbackCount = 0;
+uint32_t gx2SwapHookCallCount = 0;
 bool overlayVisible = false;
 
 bool isHomeMenuTitle(uint64_t titleId) {
@@ -114,6 +115,10 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
         root.add(WUPSConfigItemStub::Create(callbackLine));
+        char gx2Line[64];
+        std::snprintf(gx2Line, sizeof(gx2Line), "GX2 swap hook calls: %lu",
+                      static_cast<unsigned long>(gx2SwapHookCallCount));
+        root.add(WUPSConfigItemStub::Create(gx2Line));
         root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
@@ -149,6 +154,13 @@ DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer,
     real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
 }
 WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
+
+// Second diagnostic: observe scan-buffer swaps without changing rendering state.
+DECL_FUNCTION(void, GX2SwapScanBuffers) {
+    ++gx2SwapHookCallCount;
+    real_GX2SwapScanBuffers();
+}
+WUPS_MUST_REPLACE(GX2SwapScanBuffers, WUPS_LOADER_LIBRARY_GX2, GX2SwapScanBuffers);
 
 INITIALIZE_PLUGIN() {
     loadRecentApps();
