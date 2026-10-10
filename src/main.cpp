@@ -74,7 +74,7 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
         written = std::snprintf(buffer + used, bufferSize - used,
-                                "\\n%c%02u. %.45s",
+                                "\n%c%02u. %.45s",
                                 i == selectedRecentIndex ? '>' : ' ',
                                 static_cast<unsigned>(i + 1),
                                 recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
