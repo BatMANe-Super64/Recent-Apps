@@ -1,4 +1,5 @@
 #include <wups.h>
+#include <wups/storage.h>
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemStub.h>
 #include <wups/config_api.h>
@@ -20,6 +21,7 @@
 #include <atomic>
 
 WUPS_USE_WUT_DEVOPTAB();
+WUPS_USE_STORAGE("recent_apps_history");
 
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps")
 WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
@@ -34,17 +36,8 @@ constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
 constexpr uint64_t kHomeMenuKor = 0x0005001010040300ULL;
 constexpr uint64_t kHomeMenuTwn = 0x0005001010040400ULL;
 constexpr uint64_t kHomeMenuChn = 0x0005001010040500ULL;
-// Keep history in an existing SD directory so it survives title changes/reboots.
-constexpr char kHistoryPath[] = "sd:/wiiu/recent-apps.dat";
-constexpr uint32_t kHistoryMagic = 0x52415050;
-constexpr uint32_t kHistoryVersion = 1;
 constexpr size_t kHistoryCount = 10;
-
-struct HistoryFile {
-    uint32_t magic;
-    uint32_t version;
-    uint64_t titleIds[kHistoryCount];
-};
+constexpr char kHistoryStorageId[] = "recent_apps_history";
 
 uint64_t recentApps[kHistoryCount] = {};
 char recentAppNames[kHistoryCount][64] = {};
@@ -178,50 +171,52 @@ void resolveAllRecentAppNames() {
 }
 
 void loadRecentApps() {
-    FILE* file = std::fopen(kHistoryPath, "rb");
-    if (file == nullptr) {
+    for (size_t i = 0; i < kHistoryCount; ++i) {
+        char key[16];
+        std::snprintf(key, sizeof(key), "title%u", static_cast<unsigned>(i));
+        const WUPSStorageError error =
+            WUPSStorageAPI::GetOrStoreDefault(key, recentApps[i], uint64_t{0});
+        if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+            (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                                "History load failed: %.55s",
+                                WUPSStorageAPI::GetStatusStr(error));
+            return;
+        }
+    }
+
+    resolveAllRecentAppNames();
+    const WUPSStorageError saveError = WUPSStorageAPI::SaveStorage();
+    if (saveError != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: no saved file yet");
+                            "History init save failed: %.45s",
+                            WUPSStorageAPI::GetStatusStr(saveError));
         return;
     }
-
-    HistoryFile history = {};
-    const size_t bytesRead = std::fread(&history, 1, sizeof(history), file);
-    std::fclose(file);
-
-    if (bytesRead == sizeof(history) &&
-        history.magic == kHistoryMagic &&
-        history.version == kHistoryVersion) {
-        std::memcpy(recentApps, history.titleIds, sizeof(recentApps));
-        resolveAllRecentAppNames();
-        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: loaded from SD");
-    } else {
-        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: saved file invalid");
-    }
+    (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                        "History: loaded from plugin storage");
 }
 
 void saveRecentApps() {
-    HistoryFile history = {};
-    history.magic = kHistoryMagic;
-    history.version = kHistoryVersion;
-    std::memcpy(history.titleIds, recentApps, sizeof(recentApps));
-
-    FILE* file = std::fopen(kHistoryPath, "wb");
-    if (file == nullptr) {
-        (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: SD save open failed");
-        return;
+    for (size_t i = 0; i < kHistoryCount; ++i) {
+        char key[16];
+        std::snprintf(key, sizeof(key), "title%u", static_cast<unsigned>(i));
+        const WUPSStorageError error = WUPSStorageAPI::Store(key, recentApps[i]);
+        if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+            (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
+                                "History store failed: %.52s",
+                                WUPSStorageAPI::GetStatusStr(error));
+            return;
+        }
     }
-    const size_t bytesWritten = std::fwrite(&history, 1, sizeof(history), file);
-    const int closeResult = std::fclose(file);
-    if (bytesWritten == sizeof(history) && closeResult == 0) {
+
+    const WUPSStorageError saveError = WUPSStorageAPI::SaveStorage();
+    if (saveError == WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: saved to SD");
+                            "History: saved to plugin storage");
     } else {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
-                            "History: SD write failed");
+                            "History save failed: %.50s",
+                            WUPSStorageAPI::GetStatusStr(saveError));
     }
 }
 
