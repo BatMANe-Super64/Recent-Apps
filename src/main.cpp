@@ -131,15 +131,34 @@ void ShowRecentAppsNotification() {
 void HideRecentAppsNotification() {
     if (!notificationLibraryReady) return;
 
+    constexpr float kNotificationExitStaggerSeconds = 0.04f;
     bool hadNotifications = false;
-    for (size_t i = 0; i < kHistoryCount + 1; ++i) {
+    float delay = 0.0f;
+
+    // Start at the oldest title (the bottom row) and stagger upward so the
+    // stack doesn't appear to collapse all at once as the notifications fade.
+    for (size_t i = kHistoryCount; i-- > 0;) {
         const NotificationModuleHandle handle = notificationHandles[i];
         if (handle == 0) continue;
 
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(handle, 0.0f);
+            NotificationModule_FinishDynamicNotification(handle, delay);
         notificationHandles[i] = 0;
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification close failed: %s", NotificationModule_GetStatusStr(status));
+        }
+        delay += kNotificationExitStaggerSeconds;
+    }
+
+    // Keep the header until the title rows have started to leave.
+    const NotificationModuleHandle headerHandle = notificationHandles[kHistoryCount];
+    if (headerHandle != 0) {
+        hadNotifications = true;
+        const NotificationModuleStatus status =
+            NotificationModule_FinishDynamicNotification(headerHandle, delay);
+        notificationHandles[kHistoryCount] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
