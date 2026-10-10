@@ -74,13 +74,13 @@ alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
 void BuildHomeMenuLine(char* buffer, size_t bufferSize) {
     if (bufferSize == 0) return;
-    (void)std::snprintf(buffer, bufferSize, "%c01. HOME",
-                        selectedRecentIndex == 0 ? '>' : ' ');
+    (void)std::snprintf(buffer, bufferSize, "%c %02u  HOME",
+                        selectedRecentIndex == 0 ? '>' : ' ', 1u);
 }
 
 void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
     if (bufferSize == 0 || index >= kHistoryCount) return;
-    (void)std::snprintf(buffer, bufferSize, "%c%02u. %.45s",
+    (void)std::snprintf(buffer, bufferSize, "%c %02u  %.45s",
                         index + 1 == selectedRecentIndex ? '>' : ' ',
                         static_cast<unsigned>(index + 2),
                         recentAppNames[index][0] != '\0' ? recentAppNames[index] : "Unnamed title");
