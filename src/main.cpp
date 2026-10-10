@@ -2,6 +2,7 @@
 #include <wups/config/WUPSConfigCategory.h>
 #include <wups/config/WUPSConfigItemStub.h>
 #include <wups/config_api.h>
+#include <wups/button_combo/api.h>
 #include <coreinit/title.h>
 
 #include <cstdint>
@@ -10,10 +11,11 @@
 #include <string>
 
 WUPS_USE_WUT_DEVOPTAB();
+WUPS_ALLOW_OVERLAY();
 
 WUPS_PLUGIN_NAME("WiiUKioskRecentApps");
-WUPS_PLUGIN_DESCRIPTION("Tracks recent Wii U titles and lists them in the plugin configuration menu.");
-WUPS_PLUGIN_VERSION("v0.5-alpha");
+WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
+WUPS_PLUGIN_VERSION("v0.6-alpha");
 WUPS_PLUGIN_AUTHOR("Developer");
 WUPS_PLUGIN_LICENSE("GPL-3.0");
 
@@ -37,6 +39,7 @@ struct HistoryFile {
 };
 
 uint64_t recentApps[kHistoryCount] = {};
+WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -90,6 +93,36 @@ void rememberTitle(uint64_t titleId) {
         std::memcpy(recentApps, updated, sizeof(recentApps));
         saveRecentApps();
     }
+}
+
+void RecentAppsOverlayCallback(wups_overlay_options_type_t screen, void*) {
+    for (int frame = 0; frame < 120; ++frame) {
+        WUPS_Overlay_OSScreenClear(screen);
+        WUPS_Overlay_PrintTextOnScreen(screen, 1, 1, "RECENT APPS");
+        WUPS_Overlay_PrintTextOnScreen(screen, 1, 3, "Newest titles first");
+        bool anyTitles = false;
+        for (size_t i = 0; i < kHistoryCount; ++i) {
+            char line[64];
+            if (recentApps[i] == 0) {
+                std::snprintf(line, sizeof(line), "%02u. --", static_cast<unsigned>(i + 1));
+            } else {
+                std::snprintf(line, sizeof(line), "%02u. %016llX",
+                              static_cast<unsigned>(i + 1),
+                              static_cast<unsigned long long>(recentApps[i]));
+                anyTitles = true;
+            }
+            WUPS_Overlay_PrintTextOnScreen(screen, 2, 5 + static_cast<int>(i), line);
+        }
+        if (!anyTitles) {
+            WUPS_Overlay_PrintTextOnScreen(screen, 2, 7, "Launch a game to populate history.");
+        }
+        WUPS_Overlay_PrintTextOnScreen(screen, 1, 17, "Close: wait for overlay to finish");
+        WUPS_Overlay_FlipBuffers(screen);
+    }
+}
+
+void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, RecentAppsOverlayCallback, nullptr);
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
