@@ -40,6 +40,8 @@ struct HistoryFile {
 
 uint64_t recentApps[kHistoryCount] = {};
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
+char comboRegistrationLine[128] = "Shortcut registration: not initialized";
+bool overlayComboTriggered = false;
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -122,12 +124,18 @@ void RecentAppsOverlayCallback(wups_overlay_options_type_t screen, void*) {
 }
 
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    overlayComboTriggered = true;
     WUPS_OpenOverlay(WUPS_OVERLAY_DRC_AND_TV, RecentAppsOverlayCallback, nullptr);
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
+        root.add(WUPSConfigItemStub::Create("Overlay shortcut diagnostics:"));
+        root.add(WUPSConfigItemStub::Create(comboRegistrationLine));
+        root.add(WUPSConfigItemStub::Create(overlayComboTriggered
+            ? "Shortcut callback: FIRED"
+            : "Shortcut callback: not fired yet"));
         root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
@@ -168,8 +176,10 @@ INITIALIZE_PLUGIN() {
         nullptr,
         &overlayComboHandle,
         &comboStatus);
-    (void)comboError;
-    (void)comboStatus;
+    std::snprintf(comboRegistrationLine, sizeof(comboRegistrationLine),
+                  "Register: %s / Combo: %s",
+                  WUPSButtonComboAPI_GetStatusStr(comboError),
+                  WUPSButtonComboAPI_GetComboStatusStr(comboStatus));
 
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent Apps"};
     (void)WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
