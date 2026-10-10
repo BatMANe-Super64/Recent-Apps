@@ -93,8 +93,8 @@ NMColor BackgroundColorForSelection(uint32_t selection) {
         case 2: return NMColor{48, 52, 58, 255};    // Charcoal
         case 3: return NMColor{82, 86, 92, 255};    // Gray
         case 4: return NMColor{105, 125, 145, 255}; // Slate
-        case 5: return NMColor{160, 168, 176, 255}; // Silver
-        case 6: return NMColor{205, 212, 220, 255}; // Ghost Gray
+        case 5: return NMColor{125, 135, 145, 255}; // Silver
+        case 6: return NMColor{145, 155, 168, 255}; // Ghost Gray
         case 7: return NMColor{220, 35, 45, 255};   // Red
         case 8: return NMColor{235, 75, 65, 255};   // Red-Orange
         case 9: return NMColor{225, 35, 90, 255};   // Crimson
@@ -102,43 +102,43 @@ NMColor BackgroundColorForSelection(uint32_t selection) {
         case 11: return NMColor{250, 135, 35, 255}; // Orange
         case 12: return NMColor{245, 165, 45, 255}; // Orange-Yellow
         case 13: return NMColor{220, 105, 35, 255}; // Pumpkin
-        case 14: return NMColor{245, 185, 55, 255}; // Amber
-        case 15: return NMColor{245, 205, 65, 255}; // Gold
-        case 16: return NMColor{245, 230, 75, 255}; // Yellow
-        case 17: return NMColor{190, 225, 55, 255}; // Yellow-Green
-        case 18: return NMColor{125, 205, 45, 255}; // Lime
+        case 14: return NMColor{195, 135, 30, 255}; // Amber
+        case 15: return NMColor{190, 150, 30, 255}; // Gold
+        case 16: return NMColor{185, 170, 25, 255}; // Yellow
+        case 17: return NMColor{125, 160, 30, 255}; // Yellow-Green
+        case 18: return NMColor{85, 150, 25, 255}; // Lime
         case 19: return NMColor{45, 175, 70, 255};  // Green
         case 20: return NMColor{35, 155, 105, 255}; // Green-Cyan
-        case 21: return NMColor{95, 210, 155, 255}; // Mint
+        case 21: return NMColor{50, 145, 100, 255}; // Mint
         case 22: return NMColor{35, 175, 155, 255}; // Teal
         case 23: return NMColor{45, 205, 205, 255}; // Cyan
-        case 24: return NMColor{105, 220, 235, 255}; // Cyan-Blue
-        case 25: return NMColor{85, 175, 235, 255}; // Sky Blue
+        case 24: return NMColor{35, 145, 165, 255}; // Cyan-Blue
+        case 25: return NMColor{45, 125, 190, 255}; // Sky Blue
         case 26: return NMColor{35, 125, 230, 255}; // Blue
         case 27: return NMColor{65, 90, 220, 255};  // Blue-Violet
         case 28: return NMColor{70, 105, 195, 255}; // Royal Blue
-        case 29: return NMColor{95, 135, 220, 255}; // Periwinkle
+        case 29: return NMColor{70, 95, 175, 255}; // Periwinkle
         case 30: return NMColor{115, 85, 215, 255}; // Indigo
         case 31: return NMColor{150, 75, 215, 255}; // Purple
         case 32: return NMColor{175, 105, 225, 255}; // Purple-Magenta
         case 33: return NMColor{190, 95, 235, 255}; // Violet
-        case 34: return NMColor{195, 165, 235, 255}; // Lavender
+        case 34: return NMColor{120, 90, 165, 255}; // Lavender
         case 35: return NMColor{220, 65, 190, 255}; // Magenta
         case 36: return NMColor{245, 75, 165, 255}; // Hot Pink
-        case 37: return NMColor{245, 125, 185, 255}; // Pink
+        case 37: return NMColor{190, 70, 130, 255}; // Pink
         case 38: return NMColor{220, 90, 125, 255}; // Rose
         case 39: return NMColor{160, 95, 55, 255};  // Brown
         case 40: return NMColor{190, 115, 65, 255}; // Chocolate
         case 41: return NMColor{205, 135, 85, 255}; // Copper
-        case 42: return NMColor{220, 185, 115, 255}; // Sand
-        case 43: return NMColor{240, 225, 185, 255}; // Cream
+        case 42: return NMColor{155, 120, 65, 255}; // Sand
+        case 43: return NMColor{165, 145, 95, 255}; // Cream
         case 44: return NMColor{75, 155, 85, 255};  // Forest Green
         case 45: return NMColor{55, 155, 205, 255}; // Ocean Blue
-        case 46: return NMColor{70, 210, 255, 255}; // Neon Blue
-        case 47: return NMColor{145, 235, 65, 255}; // Neon Green
+        case 46: return NMColor{20, 130, 190, 255}; // Neon Blue
+        case 47: return NMColor{85, 155, 25, 255}; // Neon Green
         case 48: return NMColor{255, 90, 205, 255}; // Neon Pink
-        case 49: return NMColor{250, 125, 90, 255}; // Sunset
-        case 50: return NMColor{95, 205, 185, 255}; // Aurora
+        case 49: return NMColor{200, 80, 50, 255}; // Sunset
+        case 50: return NMColor{35, 145, 125, 255}; // Aurora
         default: return NMColor{100, 100, 100, 255};
     }
 }
