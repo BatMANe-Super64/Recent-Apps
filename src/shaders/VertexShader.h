@@ -35,7 +35,7 @@ public:
 
         if (vertexShader) {
             if (vertexShader->program) {
-                MEMFreeToMappedMemory(vertexShader->program);
+                MEMFreeToDefaultHeap(vertexShader->program);
             }
             for (uint32_t i = 0; i < vertexShader->uniformBlockCount; i++) {
                 free((void *) vertexShader->uniformBlocks[i].name);
@@ -78,7 +78,7 @@ public:
 
         //! this must be moved into an area where the graphic engine has access to and must be aligned to 0x100
         vertexShader->size    = programSize;
-        vertexShader->program = (uint8_t *) MEMAllocFromMappedMemoryForGX2Ex(vertexShader->size, GX2_SHADER_PROGRAM_ALIGNMENT);
+        vertexShader->program = (uint8_t *) MEMAllocFromDefaultHeapEx(vertexShader->size, GX2_SHADER_PROGRAM_ALIGNMENT);
         if (vertexShader->program) {
             memcpy(vertexShader->program, program, vertexShader->size);
             GX2Invalidate(GX2_INVALIDATE_MODE_CPU_SHADER, vertexShader->program, vertexShader->size);

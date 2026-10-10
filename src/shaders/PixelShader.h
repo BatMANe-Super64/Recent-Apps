@@ -31,7 +31,7 @@ public:
     ~PixelShader() override {
         if (pixelShader) {
             if (pixelShader->program) {
-                MEMFreeToMappedMemory(pixelShader->program);
+                MEMFreeToDefaultHeap(pixelShader->program);
             }
             for (uint32_t i = 0; i < pixelShader->uniformBlockCount; i++) {
                 free((void *) pixelShader->uniformBlocks[i].name);
@@ -67,7 +67,7 @@ public:
 
         //! this must be moved into an area where the graphic engine has access to and must be aligned to 0x100
         pixelShader->size    = programSize;
-        pixelShader->program = (uint8_t *) MEMAllocFromMappedMemoryForGX2Ex(pixelShader->size, GX2_SHADER_PROGRAM_ALIGNMENT);
+        pixelShader->program = (uint8_t *) MEMAllocFromDefaultHeapEx(pixelShader->size, GX2_SHADER_PROGRAM_ALIGNMENT);
         if (pixelShader->program) {
             memcpy(pixelShader->program, program, pixelShader->size);
             GX2Invalidate(GX2_INVALIDATE_MODE_CPU_SHADER, pixelShader->program, pixelShader->size);

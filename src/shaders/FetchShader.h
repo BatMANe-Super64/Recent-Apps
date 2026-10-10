@@ -25,7 +25,7 @@ public:
     FetchShader(GX2AttribStream *attributes, uint32_t attrCount, GX2FetchShaderType type = GX2_FETCH_SHADER_TESSELLATION_NONE, GX2TessellationMode tess = GX2_TESSELLATION_MODE_DISCRETE)
         : fetchShader(nullptr), fetchShaderProgramm(nullptr) {
         uint32_t shaderSize = GX2CalcFetchShaderSizeEx(attrCount, type, tess);
-        fetchShaderProgramm = (uint8_t *) MEMAllocFromMappedMemoryForGX2Ex(shaderSize, GX2_SHADER_PROGRAM_ALIGNMENT);
+        fetchShaderProgramm = (uint8_t *) MEMAllocFromDefaultHeapEx(shaderSize, GX2_SHADER_PROGRAM_ALIGNMENT);
         if (fetchShaderProgramm) {
             fetchShader = (GX2FetchShader *) memalign(0x40, sizeof(GX2FetchShader));
             GX2InitFetchShaderEx(fetchShader, fetchShaderProgramm, attrCount, attributes, type, tess);
@@ -34,7 +34,7 @@ public:
     }
     ~FetchShader() override {
         if (fetchShaderProgramm) {
-            MEMFreeToMappedMemory(fetchShaderProgramm);
+            MEMFreeToDefaultHeap(fetchShaderProgramm);
         }
         if (fetchShader) {
             free(fetchShader);

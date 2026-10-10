@@ -171,13 +171,13 @@ DECL_FUNCTION(void, GX2Init, uint32_t attributes) {
     real_GX2Init(attributes);
     if (overlayContextState == nullptr) {
         overlayContextState = static_cast<GX2ContextState*>(
-            MEMAllocFromMappedMemoryForGX2Ex(sizeof(GX2ContextState), 0x100));
+            MEMAllocFromDefaultHeapEx(sizeof(GX2ContextState), 0x100));
         if (overlayContextState != nullptr) {
             real_GX2SetupContextStateEx(overlayContextState, GX2_TRUE);
             DCInvalidateRange(overlayContextState, sizeof(GX2ContextState));
         }
         overlayColorVertices = static_cast<uint8_t*>(
-            MEMAllocFromMappedMemoryForGX2Ex(ColorShader::cuColorVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT));
+            MEMAllocFromDefaultHeapEx(ColorShader::cuColorVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT));
         if (overlayColorVertices != nullptr) {
             const uint8_t colors[16] = {
                 36, 105, 220, 238, 36, 105, 220, 238,
@@ -258,11 +258,11 @@ INITIALIZE_PLUGIN() {
 DEINITIALIZE_PLUGIN() {
     ColorShader::destroyInstance();
     if (overlayColorVertices != nullptr) {
-        MEMFreeToMappedMemory(overlayColorVertices);
+        MEMFreeToDefaultHeap(overlayColorVertices);
         overlayColorVertices = nullptr;
     }
     if (overlayContextState != nullptr) {
-        MEMFreeToMappedMemory(overlayContextState);
+        MEMFreeToDefaultHeap(overlayContextState);
         overlayContextState = nullptr;
     }
     if (overlayComboHandle.handle != nullptr) {
