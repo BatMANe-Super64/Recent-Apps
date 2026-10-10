@@ -538,32 +538,11 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
         root.add(WUPSConfigItemStub::Create("TV + Up/Down: select a recent title"));
         root.add(WUPSConfigItemStub::Create("TV + A: launch the selected title"));
-        root.add(WUPSConfigItemStub::Create("Recent titles:"));
-        bool anyTitles = false;
-
-        for (size_t i = 0; i < kHistoryCount; ++i) {
-            char line[64];
-            if (recentApps[i] == 0) {
-                std::snprintf(line, sizeof(line), "%02u. (not recorded yet)",
-                              static_cast<unsigned>(i + 1));
-            } else {
-                std::snprintf(line, sizeof(line), "%02u. %.48s",
-                              static_cast<unsigned>(i + 1),
-                              recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
-                anyTitles = true;
-            }
-            root.add(WUPSConfigItemStub::Create(line));
-        }
-
-        if (!anyTitles) {
-            root.add(WUPSConfigItemStub::Create("Launch a game/app; each distinct title fills one slot."));
-        }
     } catch (...) {
         return WUPSCONFIG_API_CALLBACK_RESULT_ERROR;
     }
     return WUPSCONFIG_API_CALLBACK_RESULT_SUCCESS;
 }
-
 void ConfigMenuClosedCallback() {}
 } // namespace
 
