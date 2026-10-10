@@ -43,3 +43,6 @@ This repository is currently a scaffold, not a functional recent-apps switcher. 
 ## License
 
 Licensed under GNU GPL v3.0. See [LICENSE](LICENSE).
+
+
+Recent titles (newest first; history saved to SD).
