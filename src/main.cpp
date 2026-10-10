@@ -160,8 +160,26 @@ void ConfigMenuClosedCallback() {}
 INITIALIZE_PLUGIN() {
     loadRecentApps();
 
+    WUPSButtonCombo_ComboStatus comboStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
+    const WUPSButtonCombo_Error comboError = WUPSButtonComboAPI_AddButtonComboPressDown(
+        "Recent Apps overlay (TV + L)",
+        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_L),
+        RecentAppsComboCallback,
+        nullptr,
+        &overlayComboHandle,
+        &comboStatus);
+    (void)comboError;
+    (void)comboStatus;
+
     WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent Apps"};
     (void)WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
+}
+
+DEINITIALIZE_PLUGIN() {
+    if (overlayComboHandle.handle != nullptr) {
+        (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
+        overlayComboHandle.handle = nullptr;
+    }
 }
 
 ON_APPLICATION_START() {
