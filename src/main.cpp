@@ -188,38 +188,47 @@ void inspectRecentTitleIcon(size_t index) {
         return;
     }
 
-    if (!acpReady) {
-        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Title icon: ACP unavailable");
-        return;
+    const uint64_t titleId = recentApps[index];
+    const uint32_t titleHigh = static_cast<uint32_t>(titleId >> 32);
+    const uint32_t titleLow = static_cast<uint32_t>(titleId & 0xFFFFFFFFULL);
+
+    // ACP's metadata directory can be valid without being accessible through
+    // the path returned on every firmware. Try the known installed-title
+    // locations on both internal storage and USB as well.
+    char candidatePaths[3][320] = {};
+    std::snprintf(candidatePaths[0], sizeof(candidatePaths[0]),
+                  "/vol/storage_mlc01/usr/title/%08X/%08X/meta/iconTex.tga",
+                  titleHigh, titleLow);
+    std::snprintf(candidatePaths[1], sizeof(candidatePaths[1]),
+                  "/vol/storage_usb01/usr/title/%08X/%08X/meta/iconTex.tga",
+                  titleHigh, titleLow);
+    candidatePaths[2][0] = '\0';
+
+    if (acpReady) {
+        char metaDirectory[256] = {};
+        const ACPResult result = ACPGetTitleMetaDir(titleId, metaDirectory,
+                                                     sizeof(metaDirectory));
+        if (result == ACP_RESULT_SUCCESS && metaDirectory[0] != '\0') {
+            std::snprintf(candidatePaths[2], sizeof(candidatePaths[2]),
+                          "%s/iconTex.tga", metaDirectory);
+        }
     }
 
-    char metaDirectory[256] = {};
-    const ACPResult result = ACPGetTitleMetaDir(recentApps[index], metaDirectory,
-                                                 sizeof(metaDirectory));
-    if (result != ACP_RESULT_SUCCESS || metaDirectory[0] == '\0') {
-        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Title icon path lookup failed: %d", static_cast<int>(result));
-        return;
+    for (const char* path : candidatePaths) {
+        if (path[0] == '\0') continue;
+        struct stat info = {};
+        if (stat(path, &info) == 0 && info.st_size > 18) {
+            const char* location = std::strstr(path, "storage_usb01") != nullptr
+                ? "USB" : (std::strstr(path, "storage_mlc01") != nullptr ? "MLC" : "ACP");
+            std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                          "Title icon found on %s (%lu bytes)", location,
+                          static_cast<unsigned long>(info.st_size));
+            return;
+        }
     }
 
-    char iconPath[320] = {};
-    const int written = std::snprintf(iconPath, sizeof(iconPath), "%s/iconTex.tga",
-                                      metaDirectory);
-    if (written < 0 || static_cast<size_t>(written) >= sizeof(iconPath)) {
-        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Title icon path is too long");
-        return;
-    }
-
-    struct stat info = {};
-    if (stat(iconPath, &info) == 0 && info.st_size > 18) {
-        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Title icon found (%lu bytes)", static_cast<unsigned long>(info.st_size));
-    } else {
-        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
-                      "Title icon file not found at metadata path");
-    }
+    std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                  "Title icon not found on MLC, USB, or ACP path");
 }
 
 void resolveRecentAppName(size_t index) {
