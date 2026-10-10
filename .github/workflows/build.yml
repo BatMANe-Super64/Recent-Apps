@@ -2,7 +2,7 @@ name: Build Wii U Aroma Plugin
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, feature/recent-apps-overlay]
   pull_request:
     branches: [main, master]
   workflow_dispatch:
