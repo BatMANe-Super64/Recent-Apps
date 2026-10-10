@@ -6,8 +6,6 @@
 #include <coreinit/title.h>
 #include <coreinit/cache.h>
 #include <gx2/swap.h>
-#include <gx2/init.h>
-#include "shaders/ColorShader.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -46,8 +44,6 @@ WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 char comboRegistrationLine[128] = "Shortcut registration: not initialized";
 uint32_t overlayComboCallbackCount = 0;
 uint32_t gx2SwapHookCallCount = 0;
-bool colorShaderInitAttempted = false;
-bool colorShaderInitSucceeded = false;
 bool overlayVisible = false;
 
 bool isHomeMenuTitle(uint64_t titleId) {
@@ -123,9 +119,6 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         std::snprintf(gx2Line, sizeof(gx2Line), "GX2 swap hook calls: %lu",
                       static_cast<unsigned long>(gx2SwapHookCallCount));
         root.add(WUPSConfigItemStub::Create(gx2Line));
-        root.add(WUPSConfigItemStub::Create(colorShaderInitAttempted
-            ? (colorShaderInitSucceeded ? "Shader initialization: OK" : "Shader initialization: FAILED")
-            : "Shader initialization: NOT TESTED"));
         root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
@@ -168,16 +161,6 @@ DECL_FUNCTION(void, GX2SwapScanBuffers) {
     real_GX2SwapScanBuffers();
 }
 WUPS_MUST_REPLACE(GX2SwapScanBuffers, WUPS_LOADER_LIBRARY_GX2, GX2SwapScanBuffers);
-
-// Third diagnostic: initialize shader objects after GX2 starts, without drawing.
-DECL_FUNCTION(void, GX2Init, uint32_t attributes) {
-    real_GX2Init(attributes);
-    if (!colorShaderInitAttempted) {
-        colorShaderInitAttempted = true;
-        colorShaderInitSucceeded = ColorShader::instance() != nullptr;
-    }
-}
-WUPS_MUST_REPLACE(GX2Init, WUPS_LOADER_LIBRARY_GX2, GX2Init);
 
 INITIALIZE_PLUGIN() {
     loadRecentApps();
