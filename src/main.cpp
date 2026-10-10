@@ -169,6 +169,42 @@ void ConfigMenuClosedCallback() {}
 } // namespace
 
 
+void initializeOverlayResources();
+void drawTestPanel(GX2ColorBuffer* colorBuffer);
+
+// Draw only after shader initialization has succeeded on a prior frame.
+// The normal scan-buffer copy always runs, including when the panel is hidden.
+DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
+    if (scanTarget == GX2_SCAN_TARGET_TV) drawTestPanel(colorBuffer);
+    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
+
+    if (!colorShaderInitAttempted) {
+        colorShaderInitAttempted = true;
+        colorShaderInitSucceeded = ColorShader::instance() != nullptr;
+    }
+}
+WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
+
+// Observe the active GX2 context and retain the application's context for restoration.
+DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
+    if (state != nullptr) {
+        gx2ContextObserved = true;
+        if (state != overlayContextState) originalContextState = state;
+    }
+    real_GX2SetContextState(state);
+}
+WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
+
+// Set up our private drawing context only after the game's own context setup has succeeded.
+DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
+    real_GX2SetupContextStateEx(state, enable);
+    if (state != nullptr) {
+        gx2ContextSetupObserved = true;
+        if (state != overlayContextState) initializeOverlayResources();
+    }
+}
+WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
+
 void initializeOverlayResources() {
     if (overlayContextState == nullptr) {
         overlayContextState = static_cast<GX2ContextState*>(
@@ -229,38 +265,7 @@ void drawTestPanel(GX2ColorBuffer* colorBuffer) {
     real_GX2SetContextState(originalContextState);
 }
 
-// Draw only after shader initialization has succeeded on a prior frame.
-// The normal scan-buffer copy always runs, including when the panel is hidden.
-DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
-    if (scanTarget == GX2_SCAN_TARGET_TV) drawTestPanel(colorBuffer);
-    real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
 
-    if (!colorShaderInitAttempted) {
-        colorShaderInitAttempted = true;
-        colorShaderInitSucceeded = ColorShader::instance() != nullptr;
-    }
-}
-WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
-
-// Observe the active GX2 context and retain the application's context for restoration.
-DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
-    if (state != nullptr) {
-        gx2ContextObserved = true;
-        if (state != overlayContextState) originalContextState = state;
-    }
-    real_GX2SetContextState(state);
-}
-WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
-
-// Set up our private drawing context only after the game's own context setup has succeeded.
-DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
-    real_GX2SetupContextStateEx(state, enable);
-    if (state != nullptr) {
-        gx2ContextSetupObserved = true;
-        if (state != overlayContextState) initializeOverlayResources();
-    }
-}
-WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
 
 // Second diagnostic: observe scan-buffer swaps without changing rendering state.
 DECL_FUNCTION(void, GX2SwapScanBuffers) {
