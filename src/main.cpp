@@ -19,6 +19,7 @@
 #include <cstring>
 #include <string>
 #include <atomic>
+#include <sys/stat.h>
 
 WUPS_USE_WUT_DEVOPTAB();
 WUPS_USE_STORAGE("recent_apps_history");
@@ -68,6 +69,7 @@ bool notificationLibraryReady = false;
 std::atomic<NotificationModuleHandle> notificationHandle{0};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
 char historyStatusLine[96] = "History: not checked";
+char titleIconStatusLine[128] = "Title icons: not checked";
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     size_t used = 0;
@@ -178,6 +180,48 @@ bool isHealthAndSafetyTitle(uint64_t titleId) {
     return false;
 }
 
+
+void inspectRecentTitleIcon(size_t index) {
+    if (index >= kHistoryCount || recentApps[index] == 0) {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon: no title selected");
+        return;
+    }
+
+    if (!acpReady) {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon: ACP unavailable");
+        return;
+    }
+
+    char metaDirectory[256] = {};
+    const ACPResult result = ACPGetTitleMetaDir(recentApps[index], metaDirectory,
+                                                 sizeof(metaDirectory));
+    if (result != ACP_RESULT_SUCCESS || metaDirectory[0] == '\0') {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon path lookup failed: %d", static_cast<int>(result));
+        return;
+    }
+
+    char iconPath[320] = {};
+    const int written = std::snprintf(iconPath, sizeof(iconPath), "%s/iconTex.tga",
+                                      metaDirectory);
+    if (written < 0 || static_cast<size_t>(written) >= sizeof(iconPath)) {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon path is too long");
+        return;
+    }
+
+    struct stat info = {};
+    if (stat(iconPath, &info) == 0 && info.st_size > 18) {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon found (%lu bytes)", static_cast<unsigned long>(info.st_size));
+    } else {
+        std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
+                      "Title icon file not found at metadata path");
+    }
+}
+
 void resolveRecentAppName(size_t index) {
     if (index >= kHistoryCount || recentApps[index] == 0) {
         if (index < kHistoryCount) recentAppNames[index][0] = '\0';
@@ -223,6 +267,7 @@ void loadRecentApps() {
     }
 
     resolveAllRecentAppNames();
+    inspectRecentTitleIcon(0);
     const WUPSStorageError saveError = WUPSStorageAPI::SaveStorage();
     if (saveError != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
@@ -278,6 +323,7 @@ void rememberTitle(uint64_t titleId, bool explicitlyLaunched = false) {
         std::memcpy(recentApps, updated, sizeof(recentApps));
         selectedRecentIndex = 0;
         resolveAllRecentAppNames();
+        inspectRecentTitleIcon(0);
         saveRecentApps();
     }
 }
@@ -377,6 +423,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         root.add(WUPSConfigItemStub::Create("TV + Up/Down: select recent title; TV + A: launch selection"));
         root.add(WUPSConfigItemStub::Create(notificationStatusLine));
         root.add(WUPSConfigItemStub::Create(historyStatusLine));
+        root.add(WUPSConfigItemStub::Create(titleIconStatusLine));
         char callbackLine[64];
         std::snprintf(callbackLine, sizeof(callbackLine), "Shortcut callback calls: %lu",
                       static_cast<unsigned long>(overlayComboCallbackCount));
@@ -479,6 +526,7 @@ INITIALIZE_PLUGIN() {
     acpReady = true;
     loadRecentApps();
     resolveAllRecentAppNames();
+    inspectRecentTitleIcon(0);
 
     const NotificationModuleStatus notificationStatus = NotificationModule_InitLibrary();
     notificationLibraryReady = notificationStatus == NOTIFICATION_MODULE_RESULT_SUCCESS;
