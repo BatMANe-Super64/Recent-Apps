@@ -9,7 +9,7 @@ TOPDIR ?= $(CURDIR)
 
 include $(DEVKITPRO)/wups/share/wups_rules
 
-TARGET   := WiiUKioskRecentApps
+TARGET   := RecentAppMenu
 BUILD    := build
 SOURCES  := src src/shaders
 DATA     :=
