@@ -63,72 +63,32 @@ alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
 alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
-    if (bufferSize == 0) return;
-
-    constexpr size_t kNotificationLineWidth = 32;
-    constexpr char kRule[] = "--------------------------------";
     size_t used = 0;
+    int written = std::snprintf(buffer, bufferSize, "Recent Apps");
+    if (written < 0 || static_cast<size_t>(written) >= bufferSize) {
+        if (bufferSize > 0) buffer[bufferSize - 1] = '\0';
+        return;
+    }
+    used = static_cast<size_t>(written);
 
-    auto append = [&](const char* text) {
-        while (*text != '\0' && used + 1 < bufferSize) {
-            buffer[used++] = *text++;
-        }
-        buffer[used] = '\0';
-    };
-    auto appendChar = [&](char ch) {
-        if (used + 1 < bufferSize) {
-            buffer[used++] = ch;
-            buffer[used] = '\0';
-        }
-    };
-
-    buffer[0] = '\0';
-    append("RECENT APPS");
-    append("\n");
-    append(kRule);
-
-    bool foundTitle = false;
-    for (size_t i = 0; i < kHistoryCount; ++i) {
+    for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
-        foundTitle = true;
-
-        append("\n");
-        char prefix[8];
-        (void)std::snprintf(prefix, sizeof(prefix), "%c%02u. ",
-                            i == selectedRecentIndex ? '>' : ' ',
-                            static_cast<unsigned>(i + 1));
-        append(prefix);
-
-        const char* name = recentAppNames[i][0] != '\0'
-                               ? recentAppNames[i]
-                               : "Unnamed title";
-        size_t column = std::strlen(prefix);
-        while (*name != '\0' && used + 1 < bufferSize) {
-            if (column >= kNotificationLineWidth) {
-                append("\n     ");
-                column = 5;
-            }
-
-            if (column > 5 && column + 1 >= kNotificationLineWidth && *name == ' ') {
-                append("\n     ");
-                column = 5;
-                ++name;
-                continue;
-            }
-
-            appendChar(*name++);
-            ++column;
+        written = std::snprintf(buffer + used, bufferSize - used,
+                                "\n%c%02u. %.45s",
+                                i == selectedRecentIndex ? '>' : ' ',
+                                static_cast<unsigned>(i + 1),
+                                recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
+        if (written < 0) break;
+        if (static_cast<size_t>(written) >= bufferSize - used) {
+            buffer[bufferSize - 1] = '\0';
+            break;
         }
+        used += static_cast<size_t>(written);
     }
 
-    if (!foundTitle) {
-        append("\nNo titles recorded yet");
+    if (used == std::strlen("Recent Apps")) {
+        (void)std::snprintf(buffer + used, bufferSize - used, "\nNo titles recorded yet");
     }
-
-    append("\n");
-    append(kRule);
-    append("\nTV + UP/DOWN: SELECT");
-    append("\nTV + A: LAUNCH");
 }
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
@@ -137,7 +97,7 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    char text[1024];
+    char text[256];
     BuildRecentAppsNotification(text, sizeof(text));
 
     NotificationModuleHandle handle = 0;
