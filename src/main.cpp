@@ -88,57 +88,57 @@ void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
 
 NMColor BackgroundColorForSelection(uint32_t selection) {
     switch (selection) {
-        case 0: return NMColor{100, 100, 100, 255};
-        case 1: return NMColor{20, 20, 20, 255};
-        case 2: return NMColor{35, 35, 40, 255};
-        case 3: return NMColor{50, 50, 50, 255};
-        case 4: return NMColor{55, 70, 85, 255};
-        case 5: return NMColor{80, 90, 100, 255};
-        case 6: return NMColor{115, 125, 135, 255};
-        case 7: return NMColor{170, 30, 40, 255};
-        case 8: return NMColor{110, 0, 15, 255};
-        case 9: return NMColor{145, 15, 45, 255};
-        case 10: return NMColor{190, 65, 55, 255};
-        case 11: return NMColor{210, 85, 0, 255};
-        case 12: return NMColor{190, 70, 0, 255};
-        case 13: return NMColor{170, 65, 10, 255};
-        case 14: return NMColor{190, 105, 0, 255};
-        case 15: return NMColor{170, 125, 15, 255};
-        case 16: return NMColor{160, 140, 0, 255};
-        case 17: return NMColor{95, 140, 0, 255};
-        case 18: return NMColor{20, 120, 45, 255};
-        case 19: return NMColor{20, 100, 55, 255};
-        case 20: return NMColor{0, 110, 80, 255};
-        case 21: return NMColor{30, 105, 90, 255};
-        case 22: return NMColor{0, 105, 105, 255};
-        case 23: return NMColor{0, 100, 120, 255};
-        case 24: return NMColor{50, 110, 140, 255};
-        case 25: return NMColor{35, 105, 160, 255};
-        case 26: return NMColor{0, 90, 180, 255};
-        case 27: return NMColor{35, 55, 145, 255};
-        case 28: return NMColor{15, 25, 85, 255};
-        case 29: return NMColor{10, 20, 55, 255};
-        case 30: return NMColor{55, 35, 120, 255};
-        case 31: return NMColor{105, 45, 150, 255};
-        case 32: return NMColor{55, 20, 85, 255};
-        case 33: return NMColor{100, 35, 145, 255};
-        case 34: return NMColor{100, 75, 130, 255};
-        case 35: return NMColor{140, 20, 105, 255};
-        case 36: return NMColor{175, 25, 105, 255};
-        case 37: return NMColor{150, 45, 90, 255};
-        case 38: return NMColor{145, 35, 65, 255};
-        case 39: return NMColor{95, 50, 25, 255};
-        case 40: return NMColor{75, 35, 15, 255};
-        case 41: return NMColor{130, 60, 30, 255};
-        case 42: return NMColor{115, 90, 50, 255};
-        case 43: return NMColor{115, 105, 75, 255};
-        case 44: return NMColor{20, 65, 35, 255};
-        case 45: return NMColor{10, 60, 100, 255};
-        case 46: return NMColor{0, 70, 150, 255};
-        case 47: return NMColor{0, 100, 30, 255};
-        case 48: return NMColor{160, 0, 90, 255};
-        case 49: return NMColor{150, 45, 20, 255};
-        case 50: return NMColor{35, 90, 100, 255};
+        case 0: return NMColor{100, 100, 100, 255}; // Standard Notifications (native styling)
+        case 1: return NMColor{24, 24, 28, 255};    // Black
+        case 2: return NMColor{48, 52, 58, 255};    // Charcoal
+        case 3: return NMColor{82, 86, 92, 255};    // Gray
+        case 4: return NMColor{105, 125, 145, 255}; // Slate
+        case 5: return NMColor{160, 168, 176, 255}; // Silver
+        case 6: return NMColor{205, 212, 220, 255}; // Ghost Gray
+        case 7: return NMColor{220, 35, 45, 255};   // Red
+        case 8: return NMColor{235, 75, 65, 255};   // Red-Orange
+        case 9: return NMColor{225, 35, 90, 255};   // Crimson
+        case 10: return NMColor{245, 105, 95, 255}; // Coral
+        case 11: return NMColor{250, 135, 35, 255}; // Orange
+        case 12: return NMColor{245, 165, 45, 255}; // Orange-Yellow
+        case 13: return NMColor{220, 105, 35, 255}; // Pumpkin
+        case 14: return NMColor{245, 185, 55, 255}; // Amber
+        case 15: return NMColor{245, 205, 65, 255}; // Gold
+        case 16: return NMColor{245, 230, 75, 255}; // Yellow
+        case 17: return NMColor{190, 225, 55, 255}; // Yellow-Green
+        case 18: return NMColor{125, 205, 45, 255}; // Lime
+        case 19: return NMColor{45, 175, 70, 255};  // Green
+        case 20: return NMColor{35, 155, 105, 255}; // Green-Cyan
+        case 21: return NMColor{95, 210, 155, 255}; // Mint
+        case 22: return NMColor{35, 175, 155, 255}; // Teal
+        case 23: return NMColor{45, 205, 205, 255}; // Cyan
+        case 24: return NMColor{105, 220, 235, 255}; // Cyan-Blue
+        case 25: return NMColor{85, 175, 235, 255}; // Sky Blue
+        case 26: return NMColor{35, 125, 230, 255}; // Blue
+        case 27: return NMColor{65, 90, 220, 255};  // Blue-Violet
+        case 28: return NMColor{70, 105, 195, 255}; // Royal Blue
+        case 29: return NMColor{95, 135, 220, 255}; // Periwinkle
+        case 30: return NMColor{115, 85, 215, 255}; // Indigo
+        case 31: return NMColor{150, 75, 215, 255}; // Purple
+        case 32: return NMColor{175, 105, 225, 255}; // Purple-Magenta
+        case 33: return NMColor{190, 95, 235, 255}; // Violet
+        case 34: return NMColor{195, 165, 235, 255}; // Lavender
+        case 35: return NMColor{220, 65, 190, 255}; // Magenta
+        case 36: return NMColor{245, 75, 165, 255}; // Hot Pink
+        case 37: return NMColor{245, 125, 185, 255}; // Pink
+        case 38: return NMColor{220, 90, 125, 255}; // Rose
+        case 39: return NMColor{160, 95, 55, 255};  // Brown
+        case 40: return NMColor{190, 115, 65, 255}; // Chocolate
+        case 41: return NMColor{205, 135, 85, 255}; // Copper
+        case 42: return NMColor{220, 185, 115, 255}; // Sand
+        case 43: return NMColor{240, 225, 185, 255}; // Cream
+        case 44: return NMColor{75, 155, 85, 255};  // Forest Green
+        case 45: return NMColor{55, 155, 205, 255}; // Ocean Blue
+        case 46: return NMColor{70, 210, 255, 255}; // Neon Blue
+        case 47: return NMColor{145, 235, 65, 255}; // Neon Green
+        case 48: return NMColor{255, 90, 205, 255}; // Neon Pink
+        case 49: return NMColor{250, 125, 90, 255}; // Sunset
+        case 50: return NMColor{95, 205, 185, 255}; // Aurora
         default: return NMColor{100, 100, 100, 255};
     }
 }
@@ -811,36 +811,36 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             {0, "Standard Notifications"},
             {1, "Black"},
             {2, "Charcoal"},
-            {3, "Dark Gray"},
-            {4, "Slate"},
+            {3, "Gray"},
+            {4, "Slate Blue"},
             {5, "Silver"},
-            {6, "Ghost Gray"},
+            {6, "Light Gray"},
             {7, "Red"},
-            {8, "Blood Red"},
+            {8, "Red-Orange"},
             {9, "Crimson"},
             {10, "Coral"},
             {11, "Orange"},
-            {12, "Halloween Orange"},
+            {12, "Orange-Yellow"},
             {13, "Pumpkin"},
             {14, "Amber"},
             {15, "Gold"},
             {16, "Yellow"},
-            {17, "Lime"},
-            {18, "Toxic Green"},
+            {17, "Yellow-Green"},
+            {18, "Lime"},
             {19, "Green"},
-            {20, "Emerald"},
+            {20, "Green-Cyan"},
             {21, "Mint"},
             {22, "Teal"},
             {23, "Cyan"},
-            {24, "Ice Blue"},
+            {24, "Cyan-Blue"},
             {25, "Sky Blue"},
             {26, "Blue"},
-            {27, "Royal Blue"},
-            {28, "Navy"},
-            {29, "Midnight Blue"},
+            {27, "Blue-Violet"},
+            {28, "Royal Blue"},
+            {29, "Periwinkle"},
             {30, "Indigo"},
             {31, "Purple"},
-            {32, "Midnight Purple"},
+            {32, "Purple-Magenta"},
             {33, "Violet"},
             {34, "Lavender"},
             {35, "Magenta"},
@@ -865,39 +865,39 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             backgroundColorSelection, backgroundColorOptions, &BackgroundColorChangedCallback));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair slotBackgroundColorOptions[] = {
-            {0, "Default Gray"},
+            {0, "Standard Notifications"},
             {1, "Black"},
             {2, "Charcoal"},
-            {3, "Dark Gray"},
-            {4, "Slate"},
+            {3, "Gray"},
+            {4, "Slate Blue"},
             {5, "Silver"},
-            {6, "Ghost Gray"},
+            {6, "Light Gray"},
             {7, "Red"},
-            {8, "Blood Red"},
+            {8, "Red-Orange"},
             {9, "Crimson"},
             {10, "Coral"},
             {11, "Orange"},
-            {12, "Halloween Orange"},
+            {12, "Orange-Yellow"},
             {13, "Pumpkin"},
             {14, "Amber"},
             {15, "Gold"},
             {16, "Yellow"},
-            {17, "Lime"},
-            {18, "Toxic Green"},
+            {17, "Yellow-Green"},
+            {18, "Lime"},
             {19, "Green"},
-            {20, "Emerald"},
+            {20, "Green-Cyan"},
             {21, "Mint"},
             {22, "Teal"},
             {23, "Cyan"},
-            {24, "Ice Blue"},
+            {24, "Cyan-Blue"},
             {25, "Sky Blue"},
             {26, "Blue"},
-            {27, "Royal Blue"},
-            {28, "Navy"},
-            {29, "Midnight Blue"},
+            {27, "Blue-Violet"},
+            {28, "Royal Blue"},
+            {29, "Periwinkle"},
             {30, "Indigo"},
             {31, "Purple"},
-            {32, "Midnight Purple"},
+            {32, "Purple-Magenta"},
             {33, "Violet"},
             {34, "Lavender"},
             {35, "Magenta"},
