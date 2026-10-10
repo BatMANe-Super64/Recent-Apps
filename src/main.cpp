@@ -46,6 +46,7 @@ constexpr size_t kHistoryCount = 10;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
 constexpr char kBackgroundColorStorageId[] = "background_color";
 constexpr uint32_t kDefaultBackgroundColor = 0;
+constexpr uint32_t kBackgroundColorCount = 51;
 
 uint64_t recentApps[kHistoryCount] = {};
 char recentAppNames[kHistoryCount][64] = {};
@@ -84,13 +85,57 @@ void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
 
 NMColor BackgroundColorForSelection(uint32_t selection) {
     switch (selection) {
+        case 0: return NMColor{100, 100, 100, 255};
         case 1: return NMColor{20, 20, 20, 255};
-        case 2: return NMColor{50, 50, 50, 255};
-        case 3: return NMColor{0, 90, 180, 255};
-        case 4: return NMColor{170, 30, 40, 255};
-        case 5: return NMColor{20, 120, 65, 255};
-        case 6: return NMColor{105, 45, 150, 255};
-        case 0:
+        case 2: return NMColor{35, 35, 40, 255};
+        case 3: return NMColor{50, 50, 50, 255};
+        case 4: return NMColor{55, 70, 85, 255};
+        case 5: return NMColor{80, 90, 100, 255};
+        case 6: return NMColor{115, 125, 135, 255};
+        case 7: return NMColor{170, 30, 40, 255};
+        case 8: return NMColor{110, 0, 15, 255};
+        case 9: return NMColor{145, 15, 45, 255};
+        case 10: return NMColor{190, 65, 55, 255};
+        case 11: return NMColor{210, 85, 0, 255};
+        case 12: return NMColor{190, 70, 0, 255};
+        case 13: return NMColor{170, 65, 10, 255};
+        case 14: return NMColor{190, 105, 0, 255};
+        case 15: return NMColor{170, 125, 15, 255};
+        case 16: return NMColor{160, 140, 0, 255};
+        case 17: return NMColor{95, 140, 0, 255};
+        case 18: return NMColor{20, 120, 45, 255};
+        case 19: return NMColor{20, 100, 55, 255};
+        case 20: return NMColor{0, 110, 80, 255};
+        case 21: return NMColor{30, 105, 90, 255};
+        case 22: return NMColor{0, 105, 105, 255};
+        case 23: return NMColor{0, 100, 120, 255};
+        case 24: return NMColor{50, 110, 140, 255};
+        case 25: return NMColor{35, 105, 160, 255};
+        case 26: return NMColor{0, 90, 180, 255};
+        case 27: return NMColor{35, 55, 145, 255};
+        case 28: return NMColor{15, 25, 85, 255};
+        case 29: return NMColor{10, 20, 55, 255};
+        case 30: return NMColor{55, 35, 120, 255};
+        case 31: return NMColor{105, 45, 150, 255};
+        case 32: return NMColor{55, 20, 85, 255};
+        case 33: return NMColor{100, 35, 145, 255};
+        case 34: return NMColor{100, 75, 130, 255};
+        case 35: return NMColor{140, 20, 105, 255};
+        case 36: return NMColor{175, 25, 105, 255};
+        case 37: return NMColor{150, 45, 90, 255};
+        case 38: return NMColor{145, 35, 65, 255};
+        case 39: return NMColor{95, 50, 25, 255};
+        case 40: return NMColor{75, 35, 15, 255};
+        case 41: return NMColor{130, 60, 30, 255};
+        case 42: return NMColor{115, 90, 50, 255};
+        case 43: return NMColor{115, 105, 75, 255};
+        case 44: return NMColor{20, 65, 35, 255};
+        case 45: return NMColor{10, 60, 100, 255};
+        case 46: return NMColor{0, 70, 150, 255};
+        case 47: return NMColor{0, 100, 30, 255};
+        case 48: return NMColor{160, 0, 90, 255};
+        case 49: return NMColor{150, 45, 20, 255};
+        case 50: return NMColor{35, 90, 100, 255};
         default: return NMColor{100, 100, 100, 255};
     }
 }
@@ -470,7 +515,7 @@ void resolveAllRecentAppNames() {
 void loadBackgroundColorSetting() {
     const WUPSStorageError error = WUPSStorageAPI::GetOrStoreDefault<uint32_t>(
         kBackgroundColorStorageId, backgroundColorSelection, kDefaultBackgroundColor);
-    if (error != WUPS_STORAGE_ERROR_SUCCESS || backgroundColorSelection > 6) {
+    if (error != WUPS_STORAGE_ERROR_SUCCESS || backgroundColorSelection >= kBackgroundColorCount) {
         backgroundColorSelection = kDefaultBackgroundColor;
     }
 }
@@ -662,7 +707,7 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
 }
 
 void BackgroundColorChangedCallback(ConfigItemMultipleValues*, uint32_t newValue) {
-    backgroundColorSelection = newValue <= 6 ? newValue : kDefaultBackgroundColor;
+    backgroundColorSelection = newValue < kBackgroundColorCount ? newValue : kDefaultBackgroundColor;
     ApplyNotificationBackgroundColor();
 
     const WUPSStorageError error =
@@ -684,11 +729,55 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
         constexpr WUPSConfigItemMultipleValues::ValuePair backgroundColorOptions[] = {
             {0, "Default Gray"},
             {1, "Black"},
-            {2, "Dark Gray"},
-            {3, "Blue"},
-            {4, "Red"},
-            {5, "Green"},
-            {6, "Purple"},
+            {2, "Charcoal"},
+            {3, "Dark Gray"},
+            {4, "Slate"},
+            {5, "Silver"},
+            {6, "Ghost Gray"},
+            {7, "Red"},
+            {8, "Blood Red"},
+            {9, "Crimson"},
+            {10, "Coral"},
+            {11, "Orange"},
+            {12, "Halloween Orange"},
+            {13, "Pumpkin"},
+            {14, "Amber"},
+            {15, "Gold"},
+            {16, "Yellow"},
+            {17, "Lime"},
+            {18, "Toxic Green"},
+            {19, "Green"},
+            {20, "Emerald"},
+            {21, "Mint"},
+            {22, "Teal"},
+            {23, "Cyan"},
+            {24, "Ice Blue"},
+            {25, "Sky Blue"},
+            {26, "Blue"},
+            {27, "Royal Blue"},
+            {28, "Navy"},
+            {29, "Midnight Blue"},
+            {30, "Indigo"},
+            {31, "Purple"},
+            {32, "Midnight Purple"},
+            {33, "Violet"},
+            {34, "Lavender"},
+            {35, "Magenta"},
+            {36, "Hot Pink"},
+            {37, "Pink"},
+            {38, "Rose"},
+            {39, "Brown"},
+            {40, "Chocolate"},
+            {41, "Copper"},
+            {42, "Sand"},
+            {43, "Cream"},
+            {44, "Forest Green"},
+            {45, "Ocean Blue"},
+            {46, "Neon Blue"},
+            {47, "Neon Green"},
+            {48, "Neon Pink"},
+            {49, "Sunset"},
+            {50, "Aurora"},
         };
         root.add(WUPSConfigItemMultipleValues::CreateFromValue(
             kBackgroundColorStorageId, "Background Color", kDefaultBackgroundColor,
