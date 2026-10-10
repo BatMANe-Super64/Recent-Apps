@@ -6,6 +6,7 @@
 #include <coreinit/title.h>
 #include <coreinit/cache.h>
 #include <sysapp/launch.h>
+#include <vpad/input.h>
 #include <notifications/notifications.h>
 #include <gx2/swap.h>
 #include <gx2/context.h>
@@ -326,6 +327,24 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 void ConfigMenuClosedCallback() {}
 } // namespace
 
+
+// Prevent TV-modified D-pad navigation from also moving the HOME Menu cursor.
+// ButtonComboModule still handles the registered TV + Up/Down shortcuts.
+DECL_FUNCTION(int32_t, VPADRead, int32_t chan, VPADStatus* buffers, uint32_t count, int32_t* error) {
+    const int32_t result = real_VPADRead(chan, buffers, count, error);
+    if (result > 0 && buffers != nullptr && overlayVisible) {
+        for (int32_t i = 0; i < result; ++i) {
+            if ((buffers[i].hold & VPAD_BUTTON_TV) != 0) {
+                constexpr uint32_t kNavigationButtons = VPAD_BUTTON_UP | VPAD_BUTTON_DOWN;
+                buffers[i].hold &= ~kNavigationButtons;
+                buffers[i].trigger &= ~kNavigationButtons;
+                buffers[i].release &= ~kNavigationButtons;
+            }
+        }
+    }
+    return result;
+}
+WUPS_MUST_REPLACE(VPADRead, WUPS_LOADER_LIBRARY_VPAD, VPADRead);
 
 // Diagnostic step: verify this GX2 hook is safe before restoring any drawing.
 DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
