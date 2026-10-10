@@ -1,12 +1,36 @@
-# Recent Apps
+# Recent Apps for Wii U
 
-A work-in-progress Aroma/WUPS plugin project for a Wii U Menu recent-apps carousel concept.
+Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list of up to ten recently used titles and lets you select and launch a title from an on-screen notification.
+
+## Features
+
+- Tracks recently used titles and keeps the newest title first.
+- Stores history in WUPS plugin storage so it persists across sessions.
+- Displays title names from installed-title metadata, falling back to the title ID when no name is available.
+- Opens and closes the Recent Apps notification with a controller shortcut.
+- Lets you move through recorded titles and launch the selected title.
+- Avoids recording the HOME Menu and filters Health and Safety from automatic startup history.
+
+The current interface uses NotificationModule notifications. **Title icons are not displayed**; icon rendering is not required for the recent-title list and launch controls to work.
+
+## Controls
+
+Use the TV button together with:
+
+| Shortcut | Action |
+| --- | --- |
+| TV + L | Toggle the Recent Apps notification |
+| TV + Up | Select the previous recorded title |
+| TV + Down | Select the next recorded title |
+| TV + A | Launch the selected title |
+
+The Up/Down shortcuts are handled while the notification is open so they do not also move the HOME Menu cursor.
 
 ## Requirements
 
 - A Wii U running Aroma
-- The Wii U plugin toolchain (WUT and WUPS development files)
-- Docker, if building with the included GitHub Actions workflow or Dockerfile
+- The WUT/WUPS plugin toolchain for local builds
+- Docker for the provided container build workflow
 
 ## Build locally
 
@@ -17,34 +41,36 @@ make clean
 make
 ```
 
-The standard WUPS rules build `WiiUKioskRecentApps.wps` in the repository root.
+The standard WUPS rules produce `WiiUKioskRecentApps.wps` in the repository root.
 
 ## Build with Docker
 
-The included Dockerfile uses the Wii U devkitPPC image and copies in the WUPS toolchain package:
+From the repository root:
 
 ```sh
 docker build --pull -t recent-apps-builder .
 docker run --rm -v "$PWD:/project" recent-apps-builder sh -lc 'make clean && make'
 ```
 
+The GitHub Actions workflow builds the plugin and uploads the resulting WPS package as an artifact. A successful CI build confirms compilation and packaging; it does not replace testing on real Wii U hardware.
+
 ## Install
 
-Copy `WiiUKioskRecentApps.wps` to the plugins directory for your Aroma environment, for example:
+Copy `WiiUKioskRecentApps.wps` to the plugins directory in your Aroma environment, for example:
 
 ```text
 sd:/wiiu/environments/aroma/plugins/WiiUKioskRecentApps.wps
 ```
 
-## Project status
+Use the artifact named `WiiUKioskRecentApps-Plugin` from a successful GitHub Actions run, or build the package locally.
 
-This repository is currently a scaffold, not a functional recent-apps switcher. The WUPS entry point does not install input or rendering hooks, recent-title history is not populated, and the drawing functions are placeholders. The build workflow checks compilation and uploads the resulting WPS artifact; it does not test runtime behavior.
+## Notes
+
+- The list holds up to ten distinct titles; launching a title already in history moves it to the newest position.
+- Health and Safety is filtered from automatic history updates. An explicit launch from Recent Apps may add it to the list.
+- NotificationModule must be available for the on-screen notification interface. If it cannot initialize, history tracking can still run but the notification UI will not be available.
+- The plugin's configuration menu includes status information for history storage, shortcut registration, notifications, and diagnostic GX2 hooks.
 
 ## License
 
-Licensed under GNU GPL v3.0. See [LICENSE](LICENSE).
-
-
-## Recent-title history
-
-Recent titles are listed newest first, and history is saved to the SD card.
+Licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
