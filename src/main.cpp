@@ -4,6 +4,7 @@
 #include <wups/config_api.h>
 #include <wups/button_combo/api.h>
 #include <coreinit/title.h>
+#include <nn/acp.h>
 #include <coreinit/cache.h>
 #include <sysapp/launch.h>
 #include <vpad/input.h>
@@ -46,6 +47,9 @@ struct HistoryFile {
 };
 
 uint64_t recentApps[kHistoryCount] = {};
+char recentAppNames[kHistoryCount][64] = {};
+alignas(0x40) ACPMetaXml titleMetaBuffer = {};
+bool acpReady = false;
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
 WUPSButtonCombo_ComboHandle previousComboHandle = {};
 WUPSButtonCombo_ComboHandle nextComboHandle = {};
@@ -78,10 +82,10 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
         written = std::snprintf(buffer + used, bufferSize - used,
-                                "\\n%c%02u. %016llX",
+                                "\\n%c%02u. %.45s",
                                 i == selectedRecentIndex ? '>' : ' ',
                                 static_cast<unsigned>(i + 1),
-                                static_cast<unsigned long long>(recentApps[i]));
+                                recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
         if (written < 0) break;
         if (static_cast<size_t>(written) >= bufferSize - used) {
             buffer[bufferSize - 1] = '\0';
@@ -143,6 +147,36 @@ bool isHomeMenuTitle(uint64_t titleId) {
            titleId == kHomeMenuChn;
 }
 
+void resolveRecentAppName(size_t index) {
+    if (index >= kHistoryCount || recentApps[index] == 0) {
+        if (index < kHistoryCount) recentAppNames[index][0] = '\0';
+        return;
+    }
+
+    recentAppNames[index][0] = '\0';
+    if (acpReady) {
+        std::memset(&titleMetaBuffer, 0, sizeof(titleMetaBuffer));
+        if (ACPGetTitleMetaXml(recentApps[index], &titleMetaBuffer) == ACP_RESULT_SUCCESS) {
+            const char* name = titleMetaBuffer.shortname_en[0] != '\0'
+                ? titleMetaBuffer.shortname_en
+                : titleMetaBuffer.longname_en;
+            if (name[0] != '\0') {
+                std::snprintf(recentAppNames[index], sizeof(recentAppNames[index]), "%s", name);
+            }
+        }
+    }
+
+    // Only show the ID when title metadata has no usable name.
+    if (recentAppNames[index][0] == '\0') {
+        std::snprintf(recentAppNames[index], sizeof(recentAppNames[index]),
+                      "%016llX", static_cast<unsigned long long>(recentApps[index]));
+    }
+}
+
+void resolveAllRecentAppNames() {
+    for (size_t i = 0; i < kHistoryCount; ++i) resolveRecentAppName(i);
+}
+
 void loadRecentApps() {
     FILE* file = std::fopen(kHistoryPath, "rb");
     if (file == nullptr) {
@@ -159,6 +193,7 @@ void loadRecentApps() {
         history.magic == kHistoryMagic &&
         history.version == kHistoryVersion) {
         std::memcpy(recentApps, history.titleIds, sizeof(recentApps));
+        resolveAllRecentAppNames();
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
                             "History: loaded from SD");
     } else {
@@ -205,6 +240,7 @@ void rememberTitle(uint64_t titleId) {
     if (std::memcmp(recentApps, updated, sizeof(recentApps)) != 0) {
         std::memcpy(recentApps, updated, sizeof(recentApps));
         selectedRecentIndex = 0;
+        resolveAllRecentAppNames();
         saveRecentApps();
     }
 }
@@ -329,9 +365,9 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
                 std::snprintf(line, sizeof(line), "%02u. (not recorded yet)",
                               static_cast<unsigned>(i + 1));
             } else {
-                std::snprintf(line, sizeof(line), "%02u. Title ID %016llX",
+                std::snprintf(line, sizeof(line), "%02u. %.48s",
                               static_cast<unsigned>(i + 1),
-                              static_cast<unsigned long long>(recentApps[i]));
+                              recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
                 anyTitles = true;
             }
             root.add(WUPSConfigItemStub::Create(line));
@@ -401,7 +437,10 @@ DECL_FUNCTION(void, GX2SwapScanBuffers) {
 WUPS_MUST_REPLACE(GX2SwapScanBuffers, WUPS_LOADER_LIBRARY_GX2, GX2SwapScanBuffers);
 
 INITIALIZE_PLUGIN() {
+    ACPInitialize();
+    acpReady = true;
     loadRecentApps();
+    resolveAllRecentAppNames();
 
     const NotificationModuleStatus notificationStatus = NotificationModule_InitLibrary();
     notificationLibraryReady = notificationStatus == NOTIFICATION_MODULE_RESULT_SUCCESS;
@@ -472,6 +511,10 @@ INITIALIZE_PLUGIN() {
 
 DEINITIALIZE_PLUGIN() {
     HideRecentAppsNotification();
+    if (acpReady) {
+        ACPFinalize();
+        acpReady = false;
+    }
     if (notificationLibraryReady) {
         (void)NotificationModule_DeInitLibrary();
         notificationLibraryReady = false;
