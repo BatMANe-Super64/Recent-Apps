@@ -23,7 +23,7 @@
 WUPS_USE_WUT_DEVOPTAB();
 WUPS_USE_STORAGE("recent_apps_history");
 
-WUPS_PLUGIN_NAME("WiiUKioskRecentApps")
+WUPS_PLUGIN_NAME("Recent App Menu")
 WUPS_PLUGIN_DESCRIPTION("Tracks recent titles and displays them in an on-screen overlay.");
 WUPS_PLUGIN_VERSION("v0.6-alpha");
 WUPS_PLUGIN_AUTHOR("Developer");
@@ -1043,7 +1043,7 @@ INITIALIZE_PLUGIN() {
     (void)launchError;
     (void)launchStatus;
 
-    WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent Apps"};
+    WUPSConfigAPIOptionsV1 configOptions = {.name = "Recent App Menu"};
     (void)WUPSConfigAPI_Init(configOptions, ConfigMenuOpenedCallback, ConfigMenuClosedCallback);
 }
 
