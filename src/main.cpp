@@ -7,8 +7,6 @@
 #include <coreinit/cache.h>
 #include <gx2/swap.h>
 #include <gx2/context.h>
-#include <gx2/state.h>
-#include <coreinit/memory.h>
 #include "shaders/ColorShader.h"
 
 #include <cstdint>
@@ -53,9 +51,6 @@ bool gx2ContextSetupObserved = false;
 bool colorShaderInitAttempted = false;
 bool colorShaderInitSucceeded = false;
 bool overlayVisible = false;
-GX2ContextState* overlayContextState = nullptr;
-GX2ContextState* originalContextState = nullptr;
-uint8_t* overlayColorVertices = nullptr;
 
 bool isHomeMenuTitle(uint64_t titleId) {
     return titleId == kHomeMenuUsa ||
@@ -169,15 +164,10 @@ void ConfigMenuClosedCallback() {}
 } // namespace
 
 
-void initializeOverlayResources();
-void drawTestPanel(GX2ColorBuffer* colorBuffer);
-
-// Draw only after shader initialization has succeeded on a prior frame.
-// The normal scan-buffer copy always runs, including when the panel is hidden.
+// Diagnostic step: verify this GX2 hook is safe before restoring any drawing.
 DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer, GX2ScanTarget scanTarget) {
-    if (scanTarget == GX2_SCAN_TARGET_TV) drawTestPanel(colorBuffer);
     real_GX2CopyColorBufferToScanBuffer(colorBuffer, scanTarget);
-
+    // Initialize shader objects once after the normal scan-buffer copy, without drawing.
     if (!colorShaderInitAttempted) {
         colorShaderInitAttempted = true;
         colorShaderInitSucceeded = ColorShader::instance() != nullptr;
@@ -185,87 +175,19 @@ DECL_FUNCTION(void, GX2CopyColorBufferToScanBuffer, GX2ColorBuffer* colorBuffer,
 }
 WUPS_MUST_REPLACE(GX2CopyColorBufferToScanBuffer, WUPS_LOADER_LIBRARY_GX2, GX2CopyColorBufferToScanBuffer);
 
-// Observe the active GX2 context and retain the application's context for restoration.
+// Third diagnostic: observe the active GX2 context without changing it.
 DECL_FUNCTION(void, GX2SetContextState, GX2ContextState* state) {
-    if (state != nullptr) {
-        gx2ContextObserved = true;
-        if (state != overlayContextState) originalContextState = state;
-    }
+    if (state != nullptr) gx2ContextObserved = true;
     real_GX2SetContextState(state);
 }
 WUPS_MUST_REPLACE(GX2SetContextState, WUPS_LOADER_LIBRARY_GX2, GX2SetContextState);
 
-// Set up our private drawing context only after the game's own context setup has succeeded.
+// Fourth diagnostic: observe context setup without altering the requested operation.
 DECL_FUNCTION(void, GX2SetupContextStateEx, GX2ContextState* state, BOOL enable) {
     real_GX2SetupContextStateEx(state, enable);
-    if (state != nullptr) {
-        gx2ContextSetupObserved = true;
-        if (state != overlayContextState) initializeOverlayResources();
-    }
+    if (state != nullptr) gx2ContextSetupObserved = true;
 }
 WUPS_MUST_REPLACE(GX2SetupContextStateEx, WUPS_LOADER_LIBRARY_GX2, GX2SetupContextStateEx);
-
-void initializeOverlayResources() {
-    if (overlayContextState == nullptr) {
-        overlayContextState = static_cast<GX2ContextState*>(
-            MEMAllocFromDefaultHeapEx(sizeof(GX2ContextState), 0x100));
-        if (overlayContextState != nullptr) {
-            real_GX2SetupContextStateEx(overlayContextState, GX2_TRUE);
-            DCInvalidateRange(overlayContextState, sizeof(GX2ContextState));
-        }
-    }
-
-    if (overlayColorVertices == nullptr) {
-        overlayColorVertices = static_cast<uint8_t*>(
-            MEMAllocFromDefaultHeapEx(ColorShader::cuColorVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT));
-        if (overlayColorVertices != nullptr) {
-            const uint8_t colors[16] = {
-                36, 105, 220, 238, 36, 105, 220, 238,
-                36, 105, 220, 238, 36, 105, 220, 238
-            };
-            std::memcpy(overlayColorVertices, colors, sizeof(colors));
-            GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER, overlayColorVertices, sizeof(colors));
-        }
-    }
-}
-
-void drawTestPanel(GX2ColorBuffer* colorBuffer) {
-    if (!overlayVisible || overlayContextState == nullptr || originalContextState == nullptr ||
-        colorBuffer == nullptr || colorBuffer->surface.image == nullptr || overlayColorVertices == nullptr ||
-        !colorShaderInitSucceeded) {
-        return;
-    }
-
-    ColorShader* shader = ColorShader::instance();
-    if (shader == nullptr) return;
-
-    real_GX2SetContextState(overlayContextState);
-    GX2SetDefaultState();
-    GX2SetColorBuffer(colorBuffer, GX2_RENDER_TARGET_0);
-    GX2SetViewport(0.0f, 0.0f, static_cast<float>(colorBuffer->surface.width),
-                   static_cast<float>(colorBuffer->surface.height), 0.0f, 1.0f);
-    GX2SetScissor(0, 0, colorBuffer->surface.width, colorBuffer->surface.height);
-    GX2SetDepthOnlyControl(GX2_FALSE, GX2_FALSE, GX2_COMPARE_FUNC_NEVER);
-    GX2SetAlphaTest(GX2_TRUE, GX2_COMPARE_FUNC_GREATER, 0.0f);
-    GX2SetColorControl(GX2_LOGIC_OP_COPY, GX2_ENABLE, GX2_DISABLE, GX2_ENABLE);
-
-    const float angle = 0.0f;
-    const float offset[4] = {-0.48f, 0.52f, 0.0f, 0.0f};
-    const float scale[4] = {0.42f, 0.25f, 1.0f, 0.0f};
-    const float intensity[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-    shader->setShaders();
-    shader->setAttributeBuffer(overlayColorVertices);
-    shader->setAngle(angle);
-    shader->setOffset(offset);
-    shader->setScale(scale);
-    shader->setColorIntensity(intensity);
-    Shader::draw(GX2_PRIMITIVE_MODE_QUADS, 4);
-    GX2Flush();
-
-    real_GX2SetContextState(originalContextState);
-}
-
-
 
 // Second diagnostic: observe scan-buffer swaps without changing rendering state.
 DECL_FUNCTION(void, GX2SwapScanBuffers) {
@@ -295,15 +217,6 @@ INITIALIZE_PLUGIN() {
 }
 
 DEINITIALIZE_PLUGIN() {
-    ColorShader::destroyInstance();
-    if (overlayColorVertices != nullptr) {
-        MEMFreeToDefaultHeap(overlayColorVertices);
-        overlayColorVertices = nullptr;
-    }
-    if (overlayContextState != nullptr) {
-        MEMFreeToDefaultHeap(overlayContextState);
-        overlayContextState = nullptr;
-    }
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
