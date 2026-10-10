@@ -71,6 +71,7 @@ char notificationStatusLine[96] = "NotificationModule: not initialized";
 char historyStatusLine[96] = "History: not checked";
 char titleIconStatusLine[128] = "Title icons: not checked";
 alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
+alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     size_t used = 0;
@@ -250,8 +251,7 @@ void inspectRecentTitleIcon(size_t index) {
             continue;
         }
 
-        uint8_t source[128 * 128 * 4];
-        if (std::fread(source, 1, sizeof(source), iconFile) != sizeof(source)) {
+        if (std::fread(titleIconSourceBgra, 1, sizeof(titleIconSourceBgra), iconFile) != sizeof(titleIconSourceBgra)) {
             std::fclose(iconFile);
             std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
                           "Icon %s: pixel data read failed", location);
@@ -268,15 +268,13 @@ void inspectRecentTitleIcon(size_t index) {
                 const size_t src = (static_cast<size_t>(sourceY) * 128 + sourceX) * 4;
                 const size_t dst = (static_cast<size_t>(y) * 128 + x) * 4;
                 // TGA true-color pixels are stored in BGRA byte order.
-                titleIconRgba[dst + 0] = source[src + 2];
-                titleIconRgba[dst + 1] = source[src + 1];
-                titleIconRgba[dst + 2] = source[src + 0];
-                titleIconRgba[dst + 3] = source[src + 3];
+                titleIconRgba[dst + 0] = titleIconSourceBgra[src + 2];
+                titleIconRgba[dst + 1] = titleIconSourceBgra[src + 1];
+                titleIconRgba[dst + 2] = titleIconSourceBgra[src + 0];
+                titleIconRgba[dst + 3] = titleIconSourceBgra[src + 3];
             }
         }
 
-        GX2Invalidate(GX2_INVALIDATE_MODE_CPU_ATTRIBUTE_BUFFER,
-                      titleIconRgba, sizeof(titleIconRgba));
         std::snprintf(titleIconStatusLine, sizeof(titleIconStatusLine),
                       "Icon %s decoded: 128x128 RGBA", location);
         return;
