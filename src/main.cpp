@@ -55,41 +55,23 @@ WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 bool overlayVisible = false;
 bool notificationLibraryReady = false;
-std::atomic<NotificationModuleHandle> notificationHandle{0};
+NotificationModuleHandle notificationHandles[kHistoryCount + 1] = {};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
 char historyStatusLine[96] = "History: not checked";
 char titleIconStatusLine[128] = "Title icons: not checked";
 alignas(0x40) uint8_t titleIconRgba[128 * 128 * 4] = {};
 alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
-void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
-    size_t used = 0;
-    int written = std::snprintf(buffer, bufferSize, "Recent Apps");
-    if (written < 0 || static_cast<size_t>(written) >= bufferSize) {
-        if (bufferSize > 0) buffer[bufferSize - 1] = '\0';
-        return;
-    }
-    used = static_cast<size_t>(written);
-
-    for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
-        if (recentApps[i] == 0) continue;
-        written = std::snprintf(buffer + used, bufferSize - used,
-                                "\n%c%02u. %.45s",
-                                i == selectedRecentIndex ? '>' : ' ',
-                                static_cast<unsigned>(i + 1),
-                                recentAppNames[i][0] != '\0' ? recentAppNames[i] : "Unnamed title");
-        if (written < 0) break;
-        if (static_cast<size_t>(written) >= bufferSize - used) {
-            buffer[bufferSize - 1] = '\0';
-            break;
-        }
-        used += static_cast<size_t>(written);
-    }
-
-    if (used == std::strlen("Recent Apps")) {
-        (void)std::snprintf(buffer + used, bufferSize - used, "\nNo titles recorded yet");
-    }
+void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
+    if (bufferSize == 0 || index >= kHistoryCount) return;
+    (void)std::snprintf(buffer, bufferSize, "%c%02u. %.45s",
+                        index == selectedRecentIndex ? '>' : ' ',
+                        static_cast<unsigned>(index + 1),
+                        recentAppNames[index][0] != '\0' ? recentAppNames[index] : "Unnamed title");
 }
+
+void HideRecentAppsNotification();
+
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
@@ -97,33 +79,74 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    char text[256];
-    BuildRecentAppsNotification(text, sizeof(text));
+    bool hasTitles = false;
+    for (size_t i = 0; i < kHistoryCount; ++i) {
+        if (recentApps[i] != 0) {
+            hasTitles = true;
+            break;
+        }
+    }
 
-    NotificationModuleHandle handle = 0;
+    // Notifications stack newest at the top. Add older titles first, then
+    // newer titles, and finally the header so the visible order is natural.
+    for (size_t i = kHistoryCount; i-- > 0;) {
+        if (recentApps[i] == 0) continue;
+
+        char text[96];
+        BuildRecentAppTitleLine(i, text, sizeof(text));
+        const NotificationModuleStatus status =
+            NotificationModule_AddDynamicNotification(text, &notificationHandles[i]);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            HideRecentAppsNotification();
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification failed: %s", NotificationModule_GetStatusStr(status));
+            return;
+        }
+    }
+
+    if (!hasTitles) {
+        const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
+            "No titles recorded yet", &notificationHandles[0]);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            HideRecentAppsNotification();
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification failed: %s", NotificationModule_GetStatusStr(status));
+            return;
+        }
+    }
+
     const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
-        text, &handle);
+        "Recent Apps", &notificationHandles[kHistoryCount]);
     if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+        HideRecentAppsNotification();
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "Notification failed: %s", NotificationModule_GetStatusStr(status));
         return;
     }
 
-    notificationHandle.store(handle);
     (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                         "NotificationModule: display requested");
 }
 
 void HideRecentAppsNotification() {
-    const NotificationModuleHandle handle = notificationHandle.load();
-    if (!notificationLibraryReady || handle == 0) return;
+    if (!notificationLibraryReady) return;
 
-    const NotificationModuleStatus status = NotificationModule_FinishDynamicNotification(handle, 0.0f);
-    if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
-        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                            "Notification close failed: %s", NotificationModule_GetStatusStr(status));
-    } else {
-        notificationHandle.store(0);
+    bool hadNotifications = false;
+    for (size_t i = 0; i < kHistoryCount + 1; ++i) {
+        const NotificationModuleHandle handle = notificationHandles[i];
+        if (handle == 0) continue;
+
+        hadNotifications = true;
+        const NotificationModuleStatus status =
+            NotificationModule_FinishDynamicNotification(handle, 0.0f);
+        notificationHandles[i] = 0;
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification close failed: %s", NotificationModule_GetStatusStr(status));
+        }
+    }
+
+    if (hadNotifications) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "NotificationModule: hidden");
     }
@@ -458,25 +481,22 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 void RefreshRecentAppsNotification() {
     if (!overlayVisible || !notificationLibraryReady) return;
 
-    const NotificationModuleHandle handle = notificationHandle.load();
-    if (handle == 0) {
-        ShowRecentAppsNotification();
-        return;
-    }
+    for (size_t i = 0; i < kHistoryCount; ++i) {
+        if (recentApps[i] == 0 || notificationHandles[i] == 0) continue;
 
-    char text[256];
-    BuildRecentAppsNotification(text, sizeof(text));
-    const NotificationModuleStatus status =
-        NotificationModule_UpdateDynamicNotificationText(handle, text);
-
-    if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
-        // Keep navigation usable on older or incompatible NotificationModule versions.
-        // The fallback can briefly flicker, but selection still updates.
-        HideRecentAppsNotification();
-        ShowRecentAppsNotification();
-        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                            "Notification update fallback: %s",
-                            NotificationModule_GetStatusStr(status));
+        char text[96];
+        BuildRecentAppTitleLine(i, text, sizeof(text));
+        const NotificationModuleStatus status =
+            NotificationModule_UpdateDynamicNotificationText(notificationHandles[i], text);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            // Recreate the stacked rows if a notification handle has gone stale.
+            HideRecentAppsNotification();
+            ShowRecentAppsNotification();
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Notification update fallback: %s",
+                                NotificationModule_GetStatusStr(status));
+            return;
+        }
     }
 }
 
