@@ -36,6 +36,12 @@ constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
 constexpr uint64_t kHomeMenuKor = 0x0005001010040300ULL;
 constexpr uint64_t kHomeMenuTwn = 0x0005001010040400ULL;
 constexpr uint64_t kHomeMenuChn = 0x0005001010040500ULL;
+constexpr uint64_t kHealthSafetyJpn = 0x000500101004A000ULL;
+constexpr uint64_t kHealthSafetyUsa = 0x000500101004A100ULL;
+constexpr uint64_t kHealthSafetyEur = 0x000500101004A200ULL;
+constexpr uint64_t kHealthSafetyKor = 0x000500101004A300ULL;
+constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
+constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
 constexpr size_t kHistoryCount = 10;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
 
@@ -140,6 +146,15 @@ bool isHomeMenuTitle(uint64_t titleId) {
            titleId == kHomeMenuChn;
 }
 
+bool isHealthAndSafetyTitle(uint64_t titleId) {
+    return titleId == kHealthSafetyUsa ||
+           titleId == kHealthSafetyEur ||
+           titleId == kHealthSafetyJpn ||
+           titleId == kHealthSafetyKor ||
+           titleId == kHealthSafetyTwn ||
+           titleId == kHealthSafetyChn;
+}
+
 void resolveRecentAppName(size_t index) {
     if (index >= kHistoryCount || recentApps[index] == 0) {
         if (index < kHistoryCount) recentAppNames[index][0] = '\0';
@@ -220,8 +235,12 @@ void saveRecentApps() {
     }
 }
 
-void rememberTitle(uint64_t titleId) {
+void rememberTitle(uint64_t titleId, bool explicitlyLaunched = false) {
     if (titleId == 0 || isHomeMenuTitle(titleId)) return;
+    // Some system startup flows report Health & Safety as the current title.
+    // Do not let that boot-time state overwrite the persisted recent list.
+    // It can still be added when the user explicitly launches it from this plugin.
+    if (isHealthAndSafetyTitle(titleId) && !explicitlyLaunched) return;
 
     uint64_t updated[kHistoryCount] = {};
     updated[0] = titleId;
@@ -315,6 +334,7 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
         return;
     }
 
+    rememberTitle(titleId, true);
     HideRecentAppsNotification();
     overlayVisible = false;
     (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
