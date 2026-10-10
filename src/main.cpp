@@ -57,17 +57,11 @@ bool notificationLibraryReady = false;
 std::atomic<NotificationModuleHandle> notificationHandle{0};
 char notificationStatusLine[96] = "NotificationModule: not initialized";
 
-void OnNotificationFinished(NotificationModuleHandle handle, void*) {
-    if (notificationHandle.load() == handle) {
-        notificationHandle.store(0);
-    }
-}
-
 void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     size_t used = 0;
     int written = std::snprintf(buffer, bufferSize, "Recent Apps");
     if (written < 0 || static_cast<size_t>(written) >= bufferSize) {
-        if (bufferSize > 0) buffer[bufferSize - 1] = '\\0';
+        if (bufferSize > 0) buffer[bufferSize - 1] = '\0';
         return;
     }
     used = static_cast<size_t>(written);
@@ -75,19 +69,19 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     for (size_t i = 0; i < kHistoryCount && used + 1 < bufferSize; ++i) {
         if (recentApps[i] == 0) continue;
         written = std::snprintf(buffer + used, bufferSize - used,
-                                "\\n%02u. %016llX",
+                                "\n%02u. %016llX",
                                 static_cast<unsigned>(i + 1),
                                 static_cast<unsigned long long>(recentApps[i]));
         if (written < 0) break;
         if (static_cast<size_t>(written) >= bufferSize - used) {
-            buffer[bufferSize - 1] = '\\0';
+            buffer[bufferSize - 1] = '\0';
             break;
         }
         used += static_cast<size_t>(written);
     }
 
     if (used == std::strlen("Recent Apps")) {
-        (void)std::snprintf(buffer + used, bufferSize - used, "\\nNo titles recorded yet");
+        (void)std::snprintf(buffer + used, bufferSize - used, "\nNo titles recorded yet");
     }
 }
 
