@@ -138,7 +138,7 @@ ColorShader::ColorShader()
     fetchShader = new FetchShader(vertexShader.getAttributeBuffer(), vertexShader.getAttributesCount());
 
     //! model vertex has to be align and cannot be in unknown regions for GX2 like 0xBCAE1000
-    positionVtxs = (float *) MEMAllocFromMappedMemoryForGX2Ex(cuPositionVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT);
+    positionVtxs = (float *) MEMAllocFromDefaultHeapEx(cuPositionVtxsSize, GX2_VERTEX_BUFFER_ALIGNMENT);
     if (positionVtxs) {
         //! position vertex structure
         int32_t i         = 0;
@@ -160,7 +160,7 @@ ColorShader::ColorShader()
 
 ColorShader::~ColorShader() {
     if (positionVtxs) {
-        MEMFreeToMappedMemory(positionVtxs);
+        MEMFreeToDefaultHeap(positionVtxs);
         positionVtxs = nullptr;
     }
 
