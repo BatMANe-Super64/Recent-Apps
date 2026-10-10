@@ -66,7 +66,9 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     if (bufferSize == 0) return;
 
     constexpr size_t kNotificationLineWidth = 32;
+    constexpr char kRule[] = "--------------------------------";
     size_t used = 0;
+
     auto append = [&](const char* text) {
         while (*text != '\0' && used + 1 < bufferSize) {
             buffer[used++] = *text++;
@@ -81,7 +83,9 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
     };
 
     buffer[0] = '\0';
-    append("Recent Apps");
+    append("RECENT APPS");
+    append("\n");
+    append(kRule);
 
     bool foundTitle = false;
     for (size_t i = 0; i < kHistoryCount; ++i) {
@@ -105,7 +109,6 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
                 column = 5;
             }
 
-            // Prefer wrapping at a space so long names remain readable.
             if (column > 5 && column + 1 >= kNotificationLineWidth && *name == ' ') {
                 append("\n     ");
                 column = 5;
@@ -118,7 +121,14 @@ void BuildRecentAppsNotification(char* buffer, size_t bufferSize) {
         }
     }
 
-    if (!foundTitle) append("\nNo titles recorded yet");
+    if (!foundTitle) {
+        append("\nNo titles recorded yet");
+    }
+
+    append("\n");
+    append(kRule);
+    append("\nTV + UP/DOWN: SELECT");
+    append("\nTV + A: LAUNCH");
 }
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
