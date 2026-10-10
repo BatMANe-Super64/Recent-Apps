@@ -95,7 +95,7 @@ void rememberTitle(uint64_t titleId) {
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
     try {
         WUPSConfigCategory root(rootHandle);
-        root.add(WUPSConfigItemStub::Create("Recent titles (newest first; history saved to SD)."));
+        root.add(WUPSConfigItemStub::Create("Recent titles."));
         bool anyTitles = false;
 
         for (size_t i = 0; i < kHistoryCount; ++i) {
