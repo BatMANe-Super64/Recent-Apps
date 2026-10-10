@@ -20,8 +20,9 @@ CFLAGS += $(INCLUDE) -D__WIIU__ -D__WUT__ -D__WUPS__
 CXXFLAGS := $(CFLAGS) -std=c++20
 ASFLAGS  := -g $(ARCH)
 LDFLAGS  = -g $(ARCH) $(RPXSPECS) -Wl,-Map,$(notdir $*.map) $(WUPSSPECS)
-LIBS     := -lwups -lwut
-LIBDIRS  := $(PORTLIBS) $(WUPS_ROOT) $(WUT_ROOT)
+LIBS     := -lwups -lwut -lnotifications
+WUMS_ROOT := $(DEVKITPRO)/wums
+LIBDIRS  := $(PORTLIBS) $(WUPS_ROOT) $(WUT_ROOT) $(WUMS_ROOT)
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
