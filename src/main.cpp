@@ -33,9 +33,6 @@ constexpr uint64_t kHomeMenuJpn = 0x0005001010040000ULL;
 constexpr uint64_t kHomeMenuKor = 0x0005001010040300ULL;
 constexpr uint64_t kHomeMenuTwn = 0x0005001010040400ULL;
 constexpr uint64_t kHomeMenuChn = 0x0005001010040500ULL;
-constexpr uint64_t kHealthSafetyJpn = 0x000500101004E000ULL;
-constexpr uint64_t kHealthSafetyUsa = 0x000500101004E100ULL;
-constexpr uint64_t kHealthSafetyEur = 0x000500101004E200ULL;
 // Keep history in an existing SD directory so it survives title changes/reboots.
 constexpr char kHistoryPath[] = "sd:/wiiu/recent-apps.dat";
 constexpr uint32_t kHistoryMagic = 0x52415050;
@@ -143,10 +140,7 @@ bool isHomeMenuTitle(uint64_t titleId) {
            titleId == kHomeMenuJpn ||
            titleId == kHomeMenuKor ||
            titleId == kHomeMenuTwn ||
-           titleId == kHomeMenuChn ||
-           titleId == kHealthSafetyJpn ||
-           titleId == kHealthSafetyUsa ||
-           titleId == kHealthSafetyEur;
+           titleId == kHomeMenuChn;
 }
 
 void loadRecentApps() {
