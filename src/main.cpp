@@ -63,6 +63,7 @@ uint32_t backgroundColorSelection = kDefaultBackgroundColor;
 uint32_t slotBackgroundColorSelections[kHistoryCount] = {};
 uint32_t randomizeSlotColorsActionSelection = 0;
 bool overlayVisible = false;
+bool configMenuOpen = false;
 uint32_t previousOverlayButtonHold = 0;
 bool notificationLibraryReady = false;
 constexpr size_t kHomeNotificationIndex = kHistoryCount;
@@ -607,6 +608,7 @@ void rememberTitle(uint64_t titleId, bool explicitlyLaunched = false) {
 }
 
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    if (configMenuOpen) return;
     overlayVisible = !overlayVisible;
     if (overlayVisible) {
         ShowRecentAppsNotification();
@@ -709,6 +711,7 @@ void LaunchSelectedRecentApp() {
 }
 
 void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    if (configMenuOpen) return;
     LaunchSelectedRecentApp();
 }
 
@@ -843,6 +846,13 @@ void SlotBackgroundColorChanged9(ConfigItemMultipleValues*, uint32_t newValue) {
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
+    configMenuOpen = true;
+    previousOverlayButtonHold = 0;
+    if (overlayVisible) {
+        overlayVisible = false;
+        HideRecentAppsNotification();
+    }
+
     try {
         LoadSlotBackgroundColors();
         WUPSConfigCategory root(rootHandle);
@@ -996,6 +1006,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 }
 void ConfigMenuClosedCallback() {
     const WUPSStorageError error = WUPSStorageAPI::SaveStorage();
+    configMenuOpen = false;
+    previousOverlayButtonHold = 0;
     if (error != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "Settings save failed: %.45s",
@@ -1009,7 +1021,11 @@ void ConfigMenuClosedCallback() {
 // TV + L toggles the menu. While it is open, plain Up/Down navigates and B closes it.
 DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
-    if (result > 0 && buffers != nullptr) {
+    // Aroma's plugin configuration owns controller input while it is open.
+    // Do not consume buttons or alter combo inputs for the Recent Apps overlay.
+    if (configMenuOpen) return result;
+
+    if (result > 0 && buffers != nullptr)
         // Keep swallowing overlay controls for every status buffer returned by
         // this read, even if B closes the menu while an earlier buffer is handled.
         const bool overlayWasVisible = overlayVisible;
