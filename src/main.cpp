@@ -15,6 +15,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <ctime>
 #include <string>
 #include <atomic>
 #include <sys/stat.h>
@@ -59,6 +61,7 @@ WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 uint32_t backgroundColorSelection = kDefaultBackgroundColor;
 uint32_t slotBackgroundColorSelections[kHistoryCount] = {};
+uint32_t randomizeSlotColorsActionSelection = 0;
 bool overlayVisible = false;
 uint32_t previousOverlayButtonHold = 0;
 bool notificationLibraryReady = false;
@@ -754,6 +757,51 @@ void SlotBackgroundColorChanged(size_t slot, uint32_t newValue) {
     ApplyNotificationBackgroundColor();
 }
 
+void RandomizeAllSlotBackgroundColors() {
+    // Shuffle the 50 custom colors and assign a different one to each slot.
+    // Standard Notifications and Use Global Color are intentionally excluded.
+    uint32_t colors[kBackgroundColorCount - 1] = {};
+    for (uint32_t i = 0; i < kBackgroundColorCount - 1; ++i) {
+        colors[i] = i + 1;
+    }
+
+    for (uint32_t i = kBackgroundColorCount - 1; i > 1; --i) {
+        const uint32_t other = static_cast<uint32_t>(std::rand()) % i;
+        const uint32_t temporary = colors[i - 1];
+        colors[i - 1] = colors[other];
+        colors[other] = temporary;
+    }
+
+    for (size_t slot = 0; slot < kHistoryCount; ++slot) {
+        slotBackgroundColorSelections[slot] = colors[slot];
+
+        char key[32] = {};
+        (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
+                            static_cast<unsigned>(slot + 1));
+        const WUPSStorageError error =
+            WUPSStorageAPI::Store(key, slotBackgroundColorSelections[slot]);
+        if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Random slot color save failed: %.35s",
+                                WUPSStorageAPI::GetStatusStr(error));
+        }
+    }
+
+    ApplyNotificationBackgroundColor();
+}
+
+void RandomizeSlotColorsActionCallback(ConfigItemMultipleValues*, uint32_t newValue) {
+    randomizeSlotColorsActionSelection = newValue;
+    if (newValue == 1 || newValue == 2) {
+        static bool randomSeeded = false;
+        if (!randomSeeded) {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            randomSeeded = true;
+        }
+        RandomizeAllSlotBackgroundColors();
+    }
+}
+
 void SlotBackgroundColorChanged0(ConfigItemMultipleValues*, uint32_t newValue) {
     SlotBackgroundColorChanged(0, newValue);
 }
@@ -915,6 +963,17 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             {kUseGlobalBackgroundColor, "Use Global Color"},
         };
         root.add(WUPSConfigItemStub::Create("Per-Slot Background Colors"));
+        randomizeSlotColorsActionSelection = 0;
+        constexpr WUPSConfigItemMultipleValues::ValuePair randomizeSlotColorsOptions[] = {
+            {0, "No Action"},
+            {1, "Randomize All Slots"},
+            {2, "Re-randomize All Slots"},
+        };
+        root.add(WUPSConfigItemMultipleValues::CreateFromValue(
+            "randomize_slot_colors", "Randomize Slot Colors", 0,
+            randomizeSlotColorsActionSelection, randomizeSlotColorsOptions,
+            &RandomizeSlotColorsActionCallback));
+
         using SlotColorCallback = void (*)(ConfigItemMultipleValues*, uint32_t);
         constexpr SlotColorCallback slotColorCallbacks[] = {&SlotBackgroundColorChanged0, &SlotBackgroundColorChanged1, &SlotBackgroundColorChanged2, &SlotBackgroundColorChanged3, &SlotBackgroundColorChanged4, &SlotBackgroundColorChanged5, &SlotBackgroundColorChanged6, &SlotBackgroundColorChanged7, &SlotBackgroundColorChanged8, &SlotBackgroundColorChanged9};
         for (size_t slot = 0; slot < kHistoryCount; ++slot) {
