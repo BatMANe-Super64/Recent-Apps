@@ -24,7 +24,7 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that displays HOME as a separa
 
 ## Controls
 
-Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **TV + A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
+Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
 
 Up/Down and B are intercepted while the menu is open so they do not also move the HOME Menu cursor or trigger the native Back action.
 
