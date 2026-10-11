@@ -672,7 +672,7 @@ void MoveRecentSelection(int direction) {
     }
 }
 
-void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+void LaunchSelectedRecentApp() {
     if (!overlayVisible) return;
 
     if (selectedRecentIndex == 0) {
@@ -703,6 +703,10 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
                         "Launch requested: %016llX",
                         static_cast<unsigned long long>(titleId));
     SYSLaunchTitle(titleId);
+}
+
+void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    LaunchSelectedRecentApp();
 }
 
 void BackgroundColorChangedCallback(ConfigItemMultipleValues*, uint32_t newValue) {
@@ -956,7 +960,7 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
             }
 
             constexpr uint32_t kOverlayButtons =
-                VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B;
+                VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B | VPAD_BUTTON_A;
             const uint32_t heldOverlayButtons = buffers[i].hold & kOverlayButtons;
             const uint32_t newlyPressedOverlayButtons =
                 heldOverlayButtons & ~previousOverlayButtonHold;
@@ -970,6 +974,9 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
                     MoveRecentSelection(-1);
                 } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_DOWN) != 0) {
                     MoveRecentSelection(1);
+                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_A) != 0 &&
+                           (buffers[i].hold & VPAD_BUTTON_TV) == 0) {
+                    LaunchSelectedRecentApp();
                 }
 
                 buffers[i].hold &= ~kOverlayButtons;
