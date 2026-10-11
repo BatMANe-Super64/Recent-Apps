@@ -39,7 +39,7 @@ make clean
 make
 ```
 
-The standard WUPS rules produce `WiiUKioskRecentApps.wps` in the repository root.
+The standard WUPS rules produce `RecentAppMenu.wps` in the repository root.
 
 ## Build with Docker
 
@@ -54,13 +54,13 @@ The GitHub Actions workflow builds the plugin and uploads the resulting WPS pack
 
 ## Install
 
-Copy `WiiUKioskRecentApps.wps` to the plugins directory in your Aroma environment, for example:
+Copy `RecentAppMenu.wps` to the plugins directory in your Aroma environment, for example:
 
 ```text
-sd:/wiiu/environments/aroma/plugins/WiiUKioskRecentApps.wps
+sd:/wiiu/environments/aroma/plugins/RecentAppMenu.wps
 ```
 
-Use the artifact named `WiiUKioskRecentApps-Plugin` from a successful GitHub Actions run, or build the package locally.
+Use the artifact named `RecentAppMenu-Plugin` from a successful GitHub Actions run, or build the package locally.
 
 ## Notes
 
