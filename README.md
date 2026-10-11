@@ -1,10 +1,10 @@
 # Recent Apps for Wii U
 
-Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list of up to nine recently used titles and lets you select and launch a title from an on-screen notification.
+Recent Apps is an Aroma/WUPS plugin for the Wii U that displays HOME as a separate, unnumbered first entry, followed by up to nine recently used titles numbered 01–09. The recent-title history persists across sessions, and you can select and launch a title from the on-screen menu.
 
 ## Features
 
-- Tracks recently used titles and keeps the newest title first.
+- Tracks up to nine recently used titles and keeps the newest title first, numbered 01–09 beneath the separate HOME entry.
 - Stores history in WUPS plugin storage so it persists across sessions.
 - Displays title names from installed-title metadata, falling back to the title ID when no name is available.
 - Opens and closes the Recent Apps notification with a controller shortcut.
@@ -57,7 +57,7 @@ Use the artifact named `RecentAppMenu-Plugin` from a successful GitHub Actions r
 
 ## Notes
 
-- The list holds up to nine distinct titles; launching a title already in history moves it to the newest position.
+- The history holds up to nine distinct recently used titles, in addition to the separate HOME entry. Launching a title already in history moves it to the newest position.
 - Health and Safety is filtered from automatic history updates. An explicit launch from Recent Apps may add it to the list.
 - NotificationModule must be available for the on-screen notification interface. If it cannot initialize, history tracking can still run but the notification UI will not be available.
 - The plugin's configuration menu includes status information for history storage, shortcut registration, notifications, and diagnostic GX2 hooks.
