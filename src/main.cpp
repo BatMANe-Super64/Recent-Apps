@@ -175,14 +175,6 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    bool hasTitles = false;
-    for (size_t i = 0; i < kHistoryCount; ++i) {
-        if (recentApps[i] != 0) {
-            hasTitles = true;
-            break;
-        }
-    }
-
     // Notifications stack newest at the top. Add older titles first, then
     // newer titles, and finally the header so the visible order is natural.
     for (size_t i = kHistoryCount; i-- > 0;) {
@@ -540,7 +532,7 @@ void loadRecentApps() {
         if (error != WUPS_STORAGE_ERROR_SUCCESS) {
             (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
                                 "History load failed: %.55s",
-                                WUPSStorageAPI::GetStatusStr(error));
+                                WUPSStorageAPI::GetStatusStr(error).data());
             return;
         }
     }
@@ -551,7 +543,7 @@ void loadRecentApps() {
     if (saveError != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
                             "History init save failed: %.45s",
-                            WUPSStorageAPI::GetStatusStr(saveError));
+                            WUPSStorageAPI::GetStatusStr(saveError).data());
         return;
     }
     (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
@@ -992,7 +984,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
                                 static_cast<unsigned>(slot + 1));
             const char* titleName = recentApps[slot] == 0
-                ? "Empty" : (recentAppNames[slot][0] != '\\0' ? recentAppNames[slot] : "Unnamed title");
+                ? "Empty" : (recentAppNames[slot][0] != '\0' ? recentAppNames[slot] : "Unnamed title");
             (void)std::snprintf(label, sizeof(label), "Slot %02u: %.58s",
                                 static_cast<unsigned>(slot + 1), titleName);
             root.add(WUPSConfigItemMultipleValues::CreateFromValue(
@@ -1025,7 +1017,7 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
     // Do not consume buttons or alter combo inputs for the Recent Apps overlay.
     if (configMenuOpen) return result;
 
-    if (result > 0 && buffers != nullptr)
+    if (result > 0 && buffers != nullptr) {
         // Keep swallowing overlay controls for every status buffer returned by
         // this read, even if B closes the menu while an earlier buffer is handled.
         const bool overlayWasVisible = overlayVisible;
