@@ -27,6 +27,7 @@ Up/Down and B are intercepted while the menu is open so they do not also move th
 ## Requirements
 
 - A Wii U running Aroma
+- NotificationModule (`notifications.wms`) for the on-screen notification interface
 - The WUT/WUPS plugin toolchain for local builds
 - Docker for the provided container build workflow
 
