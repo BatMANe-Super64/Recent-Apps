@@ -55,8 +55,6 @@ char recentAppNames[kHistoryCount][64] = {};
 alignas(0x40) ACPMetaXml titleMetaBuffer = {};
 bool acpReady = false;
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
-WUPSButtonCombo_ComboHandle previousComboHandle = {};
-WUPSButtonCombo_ComboHandle nextComboHandle = {};
 WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 uint32_t backgroundColorSelection = kDefaultBackgroundColor;
@@ -673,14 +671,6 @@ void MoveRecentSelection(int direction) {
     }
 }
 
-void RecentAppsPreviousCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
-    MoveRecentSelection(-1);
-}
-
-void RecentAppsNextCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
-    MoveRecentSelection(1);
-}
-
 void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
     if (!overlayVisible) return;
 
@@ -803,8 +793,9 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
     try {
         LoadSlotBackgroundColors();
         WUPSConfigCategory root(rootHandle);
-        root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
-        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select HOME or a recent title"));
+        root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps menu"));
+        root.add(WUPSConfigItemStub::Create("Up/Down: navigate while Recent Apps is open"));
+        root.add(WUPSConfigItemStub::Create("B: close Recent Apps menu"));
         root.add(WUPSConfigItemStub::Create("TV + A: open HOME or launch the selected title"));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair backgroundColorOptions[] = {
@@ -950,25 +941,36 @@ void ConfigMenuClosedCallback() {
 } // namespace
 
 
-// Keep TV-modified shortcuts from also triggering native HOME Menu navigation.
-// The TV + L shortcut opens Recent Apps; suppress L while TV is held so it
-// cannot also turn the HOME Menu app pages. Once the overlay is visible,
-// suppress TV + Up/Down from moving the HOME Menu cursor as well.
+// Keep the overlay controls from also triggering native HOME Menu actions.
+// TV + L toggles the menu. While it is open, plain Up/Down navigates and B closes it.
 DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
     if (result > 0 && buffers != nullptr) {
         for (int32_t i = 0; i < result; ++i) {
             if ((buffers[i].hold & VPAD_BUTTON_TV) != 0) {
-                constexpr uint32_t kNavigationButtons = VPAD_BUTTON_UP | VPAD_BUTTON_DOWN;
                 constexpr uint32_t kPageNavigationButton = VPAD_BUTTON_L;
                 buffers[i].hold &= ~kPageNavigationButton;
                 buffers[i].trigger &= ~kPageNavigationButton;
                 buffers[i].release &= ~kPageNavigationButton;
-                if (overlayVisible) {
-                    buffers[i].hold &= ~kNavigationButtons;
-                    buffers[i].trigger &= ~kNavigationButtons;
-                    buffers[i].release &= ~kNavigationButtons;
+            }
+
+            if (overlayVisible) {
+                constexpr uint32_t kOverlayButtons =
+                    VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B;
+                const uint32_t pressed = buffers[i].trigger;
+
+                if ((pressed & VPAD_BUTTON_B) != 0) {
+                    HideRecentAppsNotification();
+                    overlayVisible = false;
+                } else if ((pressed & VPAD_BUTTON_UP) != 0) {
+                    MoveRecentSelection(-1);
+                } else if ((pressed & VPAD_BUTTON_DOWN) != 0) {
+                    MoveRecentSelection(1);
                 }
+
+                buffers[i].hold &= ~kOverlayButtons;
+                buffers[i].trigger &= ~kOverlayButtons;
+                buffers[i].release &= ~kOverlayButtons;
             }
         }
     }
@@ -1008,29 +1010,6 @@ INITIALIZE_PLUGIN() {
     (void)comboError;
     (void)comboStatus;
 
-    WUPSButtonCombo_ComboStatus previousStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
-    const WUPSButtonCombo_Error previousError = WUPSButtonComboAPI_AddButtonComboPressDown(
-        "Recent Apps: previous title (TV + Up)",
-        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_UP),
-        RecentAppsPreviousCallback,
-        nullptr,
-        &previousComboHandle,
-        &previousStatus);
-
-    WUPSButtonCombo_ComboStatus nextStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
-    const WUPSButtonCombo_Error nextError = WUPSButtonComboAPI_AddButtonComboPressDown(
-        "Recent Apps: next title (TV + Down)",
-        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_DOWN),
-        RecentAppsNextCallback,
-        nullptr,
-        &nextComboHandle,
-        &nextStatus);
-
-    (void)previousError;
-    (void)previousStatus;
-    (void)nextError;
-    (void)nextStatus;
-
     WUPSButtonCombo_ComboStatus launchStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
     const WUPSButtonCombo_Error launchError = WUPSButtonComboAPI_AddButtonComboPressDown(
         "Recent Apps: launch selected title (TV + A)",
@@ -1060,14 +1039,6 @@ DEINITIALIZE_PLUGIN() {
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
-    }
-    if (previousComboHandle.handle != nullptr) {
-        (void)WUPSButtonComboAPI_RemoveButtonCombo(previousComboHandle);
-        previousComboHandle.handle = nullptr;
-    }
-    if (nextComboHandle.handle != nullptr) {
-        (void)WUPSButtonComboAPI_RemoveButtonCombo(nextComboHandle);
-        nextComboHandle.handle = nullptr;
     }
     if (launchComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(launchComboHandle);
