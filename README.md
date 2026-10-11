@@ -13,16 +13,9 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list o
 
 ## Controls
 
-Use the TV button together with:
+Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **TV + A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
 
-| Shortcut | Action |
-| --- | --- |
-| TV + L | Toggle the Recent Apps notification |
-| TV + Up | Select the previous recorded title |
-| TV + Down | Select the next recorded title |
-| TV + A | Launch the selected title |
-
-The Up/Down shortcuts are handled while the notification is open so they do not also move the HOME Menu cursor.
+Up/Down and B are intercepted while the menu is open so they do not also move the HOME Menu cursor or trigger the native Back action.
 
 ## Requirements
 
