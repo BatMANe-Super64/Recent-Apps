@@ -12,14 +12,14 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that displays HOME as a separa
 ## Features
 
 - Tracks up to nine recently used titles and keeps the newest title first, with a separate HOME entry.
-- **Persistent History:** Recent-title entries and their order are saved between sessions.
-- **Persistent Color Settings:** Your color space choices are saved and restored between sessions.
 - Displays title names from installed-title metadata
 - **Early Title Switching:** Launch another title or return to HOME during startup, without waiting for the current game to finish loading.
 - **In-Game Overlay:** Open Recent Apps with **TV + L** over ANY active games or applications.
 - **Dynamic UI Colors:** Distinct background color blocks make individual entries easy to distinguish.
 - Opens and closes the Recent Apps notification with a controller shortcut.
 - Lets you move through recorded titles and launch the selected title.
+- **Persistent History:** Recent-title entries and their order are saved between sessions.
+- **Persistent Color Settings:** Your color space choices are saved and restored between sessions.
 
 ## Controls
 
