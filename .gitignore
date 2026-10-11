@@ -1,0 +1,8 @@
+# WUPS/devkitPro build outputs
+/build/
+/*.elf
+/*.wps
+/*.map
+*.o
+*.d
+*.strip.elf
