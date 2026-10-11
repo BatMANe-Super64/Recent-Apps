@@ -1,6 +1,6 @@
 # Recent Apps for Wii U
 
-Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list of up to ten recently used titles and lets you select and launch a title from an on-screen notification.
+Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list of up to nine recently used titles and lets you select and launch a title from an on-screen notification.
 
 ## Features
 
@@ -13,16 +13,9 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that keeps a persistent list o
 
 ## Controls
 
-Use the TV button together with:
+Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **TV + A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
 
-| Shortcut | Action |
-| --- | --- |
-| TV + L | Toggle the Recent Apps notification |
-| TV + Up | Select the previous recorded title |
-| TV + Down | Select the next recorded title |
-| TV + A | Launch the selected title |
-
-The Up/Down shortcuts are handled while the notification is open so they do not also move the HOME Menu cursor.
+Up/Down and B are intercepted while the menu is open so they do not also move the HOME Menu cursor or trigger the native Back action.
 
 ## Requirements
 
@@ -64,7 +57,7 @@ Use the artifact named `RecentAppMenu-Plugin` from a successful GitHub Actions r
 
 ## Notes
 
-- The list holds up to ten distinct titles; launching a title already in history moves it to the newest position.
+- The list holds up to nine distinct titles; launching a title already in history moves it to the newest position.
 - Health and Safety is filtered from automatic history updates. An explicit launch from Recent Apps may add it to the list.
 - NotificationModule must be available for the on-screen notification interface. If it cannot initialize, history tracking can still run but the notification UI will not be available.
 - The plugin's configuration menu includes status information for history storage, shortcut registration, notifications, and diagnostic GX2 hooks.

@@ -15,6 +15,8 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
+#include <ctime>
 #include <string>
 #include <atomic>
 #include <sys/stat.h>
@@ -42,7 +44,7 @@ constexpr uint64_t kHealthSafetyEur = 0x000500101004A200ULL;
 constexpr uint64_t kHealthSafetyKor = 0x000500101004A300ULL;
 constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
 constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
-constexpr size_t kHistoryCount = 10;
+constexpr size_t kHistoryCount = 9;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
 constexpr char kBackgroundColorStorageId[] = "background_color";
 constexpr uint32_t kDefaultBackgroundColor = 0;
@@ -55,13 +57,14 @@ char recentAppNames[kHistoryCount][64] = {};
 alignas(0x40) ACPMetaXml titleMetaBuffer = {};
 bool acpReady = false;
 WUPSButtonCombo_ComboHandle overlayComboHandle = {};
-WUPSButtonCombo_ComboHandle previousComboHandle = {};
-WUPSButtonCombo_ComboHandle nextComboHandle = {};
 WUPSButtonCombo_ComboHandle launchComboHandle = {};
 size_t selectedRecentIndex = 0;
 uint32_t backgroundColorSelection = kDefaultBackgroundColor;
 uint32_t slotBackgroundColorSelections[kHistoryCount] = {};
+uint32_t randomizeSlotColorsActionSelection = 0;
 bool overlayVisible = false;
+bool configMenuOpen = false;
+uint32_t previousOverlayButtonHold = 0;
 bool notificationLibraryReady = false;
 constexpr size_t kHomeNotificationIndex = kHistoryCount;
 constexpr size_t kHeaderNotificationIndex = kHistoryCount + 1;
@@ -74,15 +77,15 @@ alignas(0x40) uint8_t titleIconSourceBgra[128 * 128 * 4] = {};
 
 void BuildHomeMenuLine(char* buffer, size_t bufferSize) {
     if (bufferSize == 0) return;
-    (void)std::snprintf(buffer, bufferSize, "%c %02u  HOME",
-                        selectedRecentIndex == 0 ? '>' : ' ', 1u);
+    (void)std::snprintf(buffer, bufferSize, "%c  HOME",
+                        selectedRecentIndex == 0 ? '>' : ' ');
 }
 
 void BuildRecentAppTitleLine(size_t index, char* buffer, size_t bufferSize) {
     if (bufferSize == 0 || index >= kHistoryCount) return;
     (void)std::snprintf(buffer, bufferSize, "%c %02u  %.45s",
                         index + 1 == selectedRecentIndex ? '>' : ' ',
-                        static_cast<unsigned>(index + 2),
+                        static_cast<unsigned>(index + 1),
                         recentAppNames[index][0] != '\0' ? recentAppNames[index] : "Unnamed title");
 }
 
@@ -170,14 +173,6 @@ void ShowRecentAppsNotification() {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "NotificationModule: unavailable");
         return;
-    }
-
-    bool hasTitles = false;
-    for (size_t i = 0; i < kHistoryCount; ++i) {
-        if (recentApps[i] != 0) {
-            hasTitles = true;
-            break;
-        }
     }
 
     // Notifications stack newest at the top. Add older titles first, then
@@ -537,7 +532,7 @@ void loadRecentApps() {
         if (error != WUPS_STORAGE_ERROR_SUCCESS) {
             (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
                                 "History load failed: %.55s",
-                                WUPSStorageAPI::GetStatusStr(error));
+                                WUPSStorageAPI::GetStatusStr(error).data());
             return;
         }
     }
@@ -548,7 +543,7 @@ void loadRecentApps() {
     if (saveError != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
                             "History init save failed: %.45s",
-                            WUPSStorageAPI::GetStatusStr(saveError));
+                            WUPSStorageAPI::GetStatusStr(saveError).data());
         return;
     }
     (void)std::snprintf(historyStatusLine, sizeof(historyStatusLine),
@@ -605,6 +600,7 @@ void rememberTitle(uint64_t titleId, bool explicitlyLaunched = false) {
 }
 
 void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    if (configMenuOpen) return;
     overlayVisible = !overlayVisible;
     if (overlayVisible) {
         ShowRecentAppsNotification();
@@ -673,15 +669,7 @@ void MoveRecentSelection(int direction) {
     }
 }
 
-void RecentAppsPreviousCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
-    MoveRecentSelection(-1);
-}
-
-void RecentAppsNextCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
-    MoveRecentSelection(1);
-}
-
-void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+void LaunchSelectedRecentApp() {
     if (!overlayVisible) return;
 
     if (selectedRecentIndex == 0) {
@@ -712,6 +700,11 @@ void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_C
                         "Launch requested: %016llX",
                         static_cast<unsigned long long>(titleId));
     SYSLaunchTitle(titleId);
+}
+
+void RecentAppsLaunchCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_ComboHandle, void*) {
+    if (configMenuOpen) return;
+    LaunchSelectedRecentApp();
 }
 
 void BackgroundColorChangedCallback(ConfigItemMultipleValues*, uint32_t newValue) {
@@ -759,6 +752,51 @@ void SlotBackgroundColorChanged(size_t slot, uint32_t newValue) {
     ApplyNotificationBackgroundColor();
 }
 
+void RandomizeAllSlotBackgroundColors() {
+    // Shuffle the 50 custom colors and assign a different one to each slot.
+    // Standard Notifications and Use Global Color are intentionally excluded.
+    uint32_t colors[kBackgroundColorCount - 1] = {};
+    for (uint32_t i = 0; i < kBackgroundColorCount - 1; ++i) {
+        colors[i] = i + 1;
+    }
+
+    for (uint32_t i = kBackgroundColorCount - 1; i > 1; --i) {
+        const uint32_t other = static_cast<uint32_t>(std::rand()) % i;
+        const uint32_t temporary = colors[i - 1];
+        colors[i - 1] = colors[other];
+        colors[other] = temporary;
+    }
+
+    for (size_t slot = 0; slot < kHistoryCount; ++slot) {
+        slotBackgroundColorSelections[slot] = colors[slot];
+
+        char key[32] = {};
+        (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
+                            static_cast<unsigned>(slot + 1));
+        const WUPSStorageError error =
+            WUPSStorageAPI::Store(key, slotBackgroundColorSelections[slot]);
+        if (error != WUPS_STORAGE_ERROR_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Random slot color save failed: %.35s",
+                                WUPSStorageAPI::GetStatusStr(error));
+        }
+    }
+
+    ApplyNotificationBackgroundColor();
+}
+
+void RandomizeSlotColorsActionCallback(ConfigItemMultipleValues*, uint32_t newValue) {
+    randomizeSlotColorsActionSelection = newValue;
+    if (newValue == 1 || newValue == 2) {
+        static bool randomSeeded = false;
+        if (!randomSeeded) {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            randomSeeded = true;
+        }
+        RandomizeAllSlotBackgroundColors();
+    }
+}
+
 void SlotBackgroundColorChanged0(ConfigItemMultipleValues*, uint32_t newValue) {
     SlotBackgroundColorChanged(0, newValue);
 }
@@ -800,11 +838,19 @@ void SlotBackgroundColorChanged9(ConfigItemMultipleValues*, uint32_t newValue) {
 }
 
 WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle rootHandle) {
+    configMenuOpen = true;
+    previousOverlayButtonHold = 0;
+    if (overlayVisible) {
+        overlayVisible = false;
+        HideRecentAppsNotification();
+    }
+
     try {
         LoadSlotBackgroundColors();
         WUPSConfigCategory root(rootHandle);
-        root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps notification"));
-        root.add(WUPSConfigItemStub::Create("TV + Up/Down: select HOME or a recent title"));
+        root.add(WUPSConfigItemStub::Create("TV + L: toggle Recent Apps menu"));
+        root.add(WUPSConfigItemStub::Create("Up/Down: navigate while Recent Apps is open"));
+        root.add(WUPSConfigItemStub::Create("B: close Recent Apps menu"));
         root.add(WUPSConfigItemStub::Create("TV + A: open HOME or launch the selected title"));
 
         constexpr WUPSConfigItemMultipleValues::ValuePair backgroundColorOptions[] = {
@@ -919,6 +965,17 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             {kUseGlobalBackgroundColor, "Use Global Color"},
         };
         root.add(WUPSConfigItemStub::Create("Per-Slot Background Colors"));
+        randomizeSlotColorsActionSelection = 0;
+        constexpr WUPSConfigItemMultipleValues::ValuePair randomizeSlotColorsOptions[] = {
+            {0, "No Action"},
+            {1, "Randomize All Slots"},
+            {2, "Re-randomize All Slots"},
+        };
+        root.add(WUPSConfigItemMultipleValues::CreateFromValue(
+            "randomize_slot_colors", "Randomize Slot Colors", 0,
+            randomizeSlotColorsActionSelection, randomizeSlotColorsOptions,
+            &RandomizeSlotColorsActionCallback));
+
         using SlotColorCallback = void (*)(ConfigItemMultipleValues*, uint32_t);
         constexpr SlotColorCallback slotColorCallbacks[] = {&SlotBackgroundColorChanged0, &SlotBackgroundColorChanged1, &SlotBackgroundColorChanged2, &SlotBackgroundColorChanged3, &SlotBackgroundColorChanged4, &SlotBackgroundColorChanged5, &SlotBackgroundColorChanged6, &SlotBackgroundColorChanged7, &SlotBackgroundColorChanged8, &SlotBackgroundColorChanged9};
         for (size_t slot = 0; slot < kHistoryCount; ++slot) {
@@ -927,7 +984,7 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
             (void)std::snprintf(key, sizeof(key), "%s%02u", kSlotBackgroundColorStoragePrefix,
                                 static_cast<unsigned>(slot + 1));
             const char* titleName = recentApps[slot] == 0
-                ? "Empty" : (recentAppNames[slot][0] != '\\0' ? recentAppNames[slot] : "Unnamed title");
+                ? "Empty" : (recentAppNames[slot][0] != '\0' ? recentAppNames[slot] : "Unnamed title");
             (void)std::snprintf(label, sizeof(label), "Slot %02u: %.58s",
                                 static_cast<unsigned>(slot + 1), titleName);
             root.add(WUPSConfigItemMultipleValues::CreateFromValue(
@@ -941,6 +998,8 @@ WUPSConfigAPICallbackStatus ConfigMenuOpenedCallback(WUPSConfigCategoryHandle ro
 }
 void ConfigMenuClosedCallback() {
     const WUPSStorageError error = WUPSStorageAPI::SaveStorage();
+    configMenuOpen = false;
+    previousOverlayButtonHold = 0;
     if (error != WUPS_STORAGE_ERROR_SUCCESS) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "Settings save failed: %.45s",
@@ -950,25 +1009,54 @@ void ConfigMenuClosedCallback() {
 } // namespace
 
 
-// Keep TV-modified shortcuts from also triggering native HOME Menu navigation.
-// The TV + L shortcut opens Recent Apps; suppress L while TV is held so it
-// cannot also turn the HOME Menu app pages. Once the overlay is visible,
-// suppress TV + Up/Down from moving the HOME Menu cursor as well.
+// Keep the overlay controls from also triggering native HOME Menu actions.
+// TV + L toggles the menu. While it is open, plain Up/Down navigates and B closes it.
 DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
+    // Aroma's plugin configuration owns controller input while it is open.
+    // Do not consume buttons or alter combo inputs for the Recent Apps overlay.
+    if (configMenuOpen) return result;
+
     if (result > 0 && buffers != nullptr) {
+        // Keep swallowing overlay controls for every status buffer returned by
+        // this read, even if B closes the menu while an earlier buffer is handled.
+        const bool overlayWasVisible = overlayVisible;
         for (int32_t i = 0; i < result; ++i) {
             if ((buffers[i].hold & VPAD_BUTTON_TV) != 0) {
-                constexpr uint32_t kNavigationButtons = VPAD_BUTTON_UP | VPAD_BUTTON_DOWN;
                 constexpr uint32_t kPageNavigationButton = VPAD_BUTTON_L;
                 buffers[i].hold &= ~kPageNavigationButton;
                 buffers[i].trigger &= ~kPageNavigationButton;
                 buffers[i].release &= ~kPageNavigationButton;
+            }
+
+            constexpr uint32_t kOverlayButtons =
+                VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B | VPAD_BUTTON_A;
+            const uint32_t heldOverlayButtons = buffers[i].hold & kOverlayButtons;
+            const uint32_t newlyPressedOverlayButtons =
+                heldOverlayButtons & ~previousOverlayButtonHold;
+            previousOverlayButtonHold = heldOverlayButtons;
+
+            if (overlayWasVisible) {
                 if (overlayVisible) {
-                    buffers[i].hold &= ~kNavigationButtons;
-                    buffers[i].trigger &= ~kNavigationButtons;
-                    buffers[i].release &= ~kNavigationButtons;
+                    if ((newlyPressedOverlayButtons & VPAD_BUTTON_B) != 0) {
+                        HideRecentAppsNotification();
+                        overlayVisible = false;
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_UP) != 0) {
+                        MoveRecentSelection(-1);
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_DOWN) != 0) {
+                        MoveRecentSelection(1);
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_A) != 0 &&
+                               (buffers[i].hold & VPAD_BUTTON_TV) == 0) {
+                        LaunchSelectedRecentApp();
+                    }
                 }
+
+                // Consume controls even if the menu was closed earlier in this read.
+                buffers[i].hold &= ~kOverlayButtons;
+                buffers[i].trigger &= ~kOverlayButtons;
+                buffers[i].release &= ~kOverlayButtons;
+            } else {
+                previousOverlayButtonHold = 0;
             }
         }
     }
@@ -1008,29 +1096,6 @@ INITIALIZE_PLUGIN() {
     (void)comboError;
     (void)comboStatus;
 
-    WUPSButtonCombo_ComboStatus previousStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
-    const WUPSButtonCombo_Error previousError = WUPSButtonComboAPI_AddButtonComboPressDown(
-        "Recent Apps: previous title (TV + Up)",
-        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_UP),
-        RecentAppsPreviousCallback,
-        nullptr,
-        &previousComboHandle,
-        &previousStatus);
-
-    WUPSButtonCombo_ComboStatus nextStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
-    const WUPSButtonCombo_Error nextError = WUPSButtonComboAPI_AddButtonComboPressDown(
-        "Recent Apps: next title (TV + Down)",
-        static_cast<WUPSButtonCombo_Buttons>(WUPS_BUTTON_COMBO_BUTTON_TV | WUPS_BUTTON_COMBO_BUTTON_DOWN),
-        RecentAppsNextCallback,
-        nullptr,
-        &nextComboHandle,
-        &nextStatus);
-
-    (void)previousError;
-    (void)previousStatus;
-    (void)nextError;
-    (void)nextStatus;
-
     WUPSButtonCombo_ComboStatus launchStatus = WUPS_BUTTON_COMBO_COMBO_STATUS_INVALID_STATUS;
     const WUPSButtonCombo_Error launchError = WUPSButtonComboAPI_AddButtonComboPressDown(
         "Recent Apps: launch selected title (TV + A)",
@@ -1060,14 +1125,6 @@ DEINITIALIZE_PLUGIN() {
     if (overlayComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(overlayComboHandle);
         overlayComboHandle.handle = nullptr;
-    }
-    if (previousComboHandle.handle != nullptr) {
-        (void)WUPSButtonComboAPI_RemoveButtonCombo(previousComboHandle);
-        previousComboHandle.handle = nullptr;
-    }
-    if (nextComboHandle.handle != nullptr) {
-        (void)WUPSButtonComboAPI_RemoveButtonCombo(nextComboHandle);
-        nextComboHandle.handle = nullptr;
     }
     if (launchComboHandle.handle != nullptr) {
         (void)WUPSButtonComboAPI_RemoveButtonCombo(launchComboHandle);
