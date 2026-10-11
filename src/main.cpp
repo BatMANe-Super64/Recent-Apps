@@ -662,7 +662,8 @@ void MoveRecentSelection(int direction) {
 
         const size_t titleIndex = selectedRecentIndex - 1;
         if (recentApps[titleIndex] != 0) {
-            inspectRecentTitleIcon(titleIndex);
+            // Keep navigation lightweight: icon inspection performs synchronous
+            // filesystem I/O and image processing, which can hitch gameplay.
             RefreshRecentAppsNotification();
             return;
         }
