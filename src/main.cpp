@@ -951,6 +951,9 @@ void ConfigMenuClosedCallback() {
 DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t count, VPADReadError* error) {
     const int32_t result = real_VPADRead(chan, buffers, count, error);
     if (result > 0 && buffers != nullptr) {
+        // Keep swallowing overlay controls for every status buffer returned by
+        // this read, even if B closes the menu while an earlier buffer is handled.
+        const bool overlayWasVisible = overlayVisible;
         for (int32_t i = 0; i < result; ++i) {
             if ((buffers[i].hold & VPAD_BUTTON_TV) != 0) {
                 constexpr uint32_t kPageNavigationButton = VPAD_BUTTON_L;
@@ -966,19 +969,22 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
                 heldOverlayButtons & ~previousOverlayButtonHold;
             previousOverlayButtonHold = heldOverlayButtons;
 
-            if (overlayVisible) {
-                if ((newlyPressedOverlayButtons & VPAD_BUTTON_B) != 0) {
-                    HideRecentAppsNotification();
-                    overlayVisible = false;
-                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_UP) != 0) {
-                    MoveRecentSelection(-1);
-                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_DOWN) != 0) {
-                    MoveRecentSelection(1);
-                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_A) != 0 &&
-                           (buffers[i].hold & VPAD_BUTTON_TV) == 0) {
-                    LaunchSelectedRecentApp();
+            if (overlayWasVisible) {
+                if (overlayVisible) {
+                    if ((newlyPressedOverlayButtons & VPAD_BUTTON_B) != 0) {
+                        HideRecentAppsNotification();
+                        overlayVisible = false;
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_UP) != 0) {
+                        MoveRecentSelection(-1);
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_DOWN) != 0) {
+                        MoveRecentSelection(1);
+                    } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_A) != 0 &&
+                               (buffers[i].hold & VPAD_BUTTON_TV) == 0) {
+                        LaunchSelectedRecentApp();
+                    }
                 }
 
+                // Consume controls even if the menu was closed earlier in this read.
                 buffers[i].hold &= ~kOverlayButtons;
                 buffers[i].trigger &= ~kOverlayButtons;
                 buffers[i].release &= ~kOverlayButtons;
