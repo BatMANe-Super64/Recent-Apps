@@ -60,6 +60,7 @@ size_t selectedRecentIndex = 0;
 uint32_t backgroundColorSelection = kDefaultBackgroundColor;
 uint32_t slotBackgroundColorSelections[kHistoryCount] = {};
 bool overlayVisible = false;
+uint32_t previousOverlayButtonHold = 0;
 bool notificationLibraryReady = false;
 constexpr size_t kHomeNotificationIndex = kHistoryCount;
 constexpr size_t kHeaderNotificationIndex = kHistoryCount + 1;
@@ -954,23 +955,28 @@ DECL_FUNCTION(int32_t, VPADRead, VPADChan chan, VPADStatus* buffers, uint32_t co
                 buffers[i].release &= ~kPageNavigationButton;
             }
 
-            if (overlayVisible) {
-                constexpr uint32_t kOverlayButtons =
-                    VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B;
-                const uint32_t pressed = buffers[i].trigger;
+            constexpr uint32_t kOverlayButtons =
+                VPAD_BUTTON_UP | VPAD_BUTTON_DOWN | VPAD_BUTTON_B;
+            const uint32_t heldOverlayButtons = buffers[i].hold & kOverlayButtons;
+            const uint32_t newlyPressedOverlayButtons =
+                heldOverlayButtons & ~previousOverlayButtonHold;
+            previousOverlayButtonHold = heldOverlayButtons;
 
-                if ((pressed & VPAD_BUTTON_B) != 0) {
+            if (overlayVisible) {
+                if ((newlyPressedOverlayButtons & VPAD_BUTTON_B) != 0) {
                     HideRecentAppsNotification();
                     overlayVisible = false;
-                } else if ((pressed & VPAD_BUTTON_UP) != 0) {
+                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_UP) != 0) {
                     MoveRecentSelection(-1);
-                } else if ((pressed & VPAD_BUTTON_DOWN) != 0) {
+                } else if ((newlyPressedOverlayButtons & VPAD_BUTTON_DOWN) != 0) {
                     MoveRecentSelection(1);
                 }
 
                 buffers[i].hold &= ~kOverlayButtons;
                 buffers[i].trigger &= ~kOverlayButtons;
                 buffers[i].release &= ~kOverlayButtons;
+            } else {
+                previousOverlayButtonHold = 0;
             }
         }
     }
