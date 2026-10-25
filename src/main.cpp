@@ -46,10 +46,11 @@ constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
 constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
 constexpr uint64_t kNanoAssaultNeoUsa = 0x0005000010110100ULL;
 constexpr uint64_t kNanoAssaultNeoEur = 0x0005000010110600ULL;
+constexpr uint64_t kNanoAssaultNeoJpn = 0x0005000010136400ULL;
 
 bool IsNanoAssaultNeoRunning() {
     const uint64_t titleId = OSGetTitleID();
-    return titleId == kNanoAssaultNeoUsa || titleId == kNanoAssaultNeoEur;
+    return titleId == kNanoAssaultNeoUsa || titleId == kNanoAssaultNeoEur || titleId == kNanoAssaultNeoJpn;
 }
 
 constexpr size_t kHistoryCount = 9;
