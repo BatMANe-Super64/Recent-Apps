@@ -168,14 +168,6 @@ void ApplyNotificationBackgroundColor() {
 
 void HideRecentAppsNotification();
 
-constexpr uint64_t kNanoAssaultNeoUsa = 0x0005000010110100ULL;
-constexpr uint64_t kNanoAssaultNeoEur = 0x0005000010110600ULL;
-
-bool IsNanoAssaultNeo() {
-    const uint64_t titleId = OSGetTitleID();
-    return titleId == kNanoAssaultNeoUsa || titleId == kNanoAssaultNeoEur;
-}
-
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
@@ -183,9 +175,9 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    // Diagnostic only: one notification instead of the animated stack in Nano Assault Neo.
+    // Diagnostic build: use a single notification for all titles to isolate slide-in cost.
     // NotificationModule still animates this single entry; this does NOT disable slide-in.
-    if (IsNanoAssaultNeo()) {
+    {
         const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
             "Recent Apps: Nano diagnostic", &notificationHandles[kHeaderNotificationIndex]);
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
