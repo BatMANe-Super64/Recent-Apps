@@ -177,10 +177,32 @@ void ApplyNotificationBackgroundColor() {
 
 void HideRecentAppsNotification();
 
+void BuildNanoCompactText(char* text, size_t size) {
+    if (selectedRecentIndex == 0) {
+        BuildHomeMenuLine(text, size);
+    } else {
+        BuildRecentAppTitleLine(selectedRecentIndex - 1, text, size);
+    }
+}
+
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "NotificationModule: unavailable");
+        return;
+    }
+
+    if (IsNanoAssaultNeoRunning()) {
+        char compactText[128];
+        BuildNanoCompactText(compactText, sizeof(compactText));
+        const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
+            compactText, &notificationHandles[kHeaderNotificationIndex]);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Nano compact overlay failed: %s", NotificationModule_GetStatusStr(status));
+            return;
+        }
+        ApplyNotificationBackgroundColor();
         return;
     }
 
@@ -620,6 +642,19 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 
 void RefreshRecentAppsNotification() {
     if (!overlayVisible || !notificationLibraryReady) return;
+
+    if (IsNanoAssaultNeoRunning()) {
+        const NotificationModuleHandle handle = notificationHandles[kHeaderNotificationIndex];
+        if (handle == 0) return;
+        char compactText[128];
+        BuildNanoCompactText(compactText, sizeof(compactText));
+        const NotificationModuleStatus status = NotificationModule_UpdateDynamicNotificationText(handle, compactText);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Nano compact update failed: %s", NotificationModule_GetStatusStr(status));
+        }
+        return;
+    }
 
     for (size_t i = 0; i < kHistoryCount; ++i) {
         if (recentApps[i] == 0 || notificationHandles[i] == 0) continue;
