@@ -168,6 +168,33 @@ void ApplyNotificationBackgroundColor() {
 
 void HideRecentAppsNotification();
 
+// Experimental: render the complete menu inside one dynamic notification.
+// NotificationModule may clip newlines or impose a text-length limit.
+void BuildMultilineRecentAppsText(char* buffer, size_t bufferSize) {
+    if (bufferSize == 0) return;
+    size_t used = 0;
+    int written = std::snprintf(buffer, bufferSize, "RECENT APPS\n");
+    if (written < 0) return;
+    used = static_cast<size_t>(written);
+    if (used >= bufferSize) { buffer[bufferSize - 1] = '\0'; return; }
+
+    char line[96];
+    BuildHomeMenuLine(line, sizeof(line));
+    written = std::snprintf(buffer + used, bufferSize - used, "%s\n", line);
+    if (written < 0) return;
+    used += static_cast<size_t>(written);
+    if (used >= bufferSize) { buffer[bufferSize - 1] = '\0'; return; }
+
+    for (size_t i = 0; i < kHistoryCount; ++i) {
+        if (recentApps[i] == 0) continue;
+        BuildRecentAppTitleLine(i, line, sizeof(line));
+        written = std::snprintf(buffer + used, bufferSize - used, "%s\n", line);
+        if (written < 0) return;
+        used += static_cast<size_t>(written);
+        if (used >= bufferSize) { buffer[bufferSize - 1] = '\0'; return; }
+    }
+}
+
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
@@ -175,18 +202,13 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    // Nano-compatible compact overlay: keep exactly one animated notification.
-    // Selection still navigates the complete recent-title history.
-    char compactText[128];
-    if (selectedRecentIndex == 0) {
-        BuildHomeMenuLine(compactText, sizeof(compactText));
-    } else {
-        BuildRecentAppTitleLine(selectedRecentIndex - 1, compactText, sizeof(compactText));
-    }
-    const NotificationModuleStatus compactStatus =
-        NotificationModule_AddDynamicNotification(compactText, &notificationHandles[kHeaderNotificationIndex]);
+    // One NotificationModule handle, full multiline recent-app menu.
+    char multilineText[1024];
+    BuildMultilineRecentAppsText(multilineText, sizeof(multilineText));
+    const NotificationModuleStatus multilineStatus =
+        NotificationModule_AddDynamicNotification(multilineText, &notificationHandles[kHeaderNotificationIndex]);
     (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                        "Compact overlay: %s", NotificationModule_GetStatusStr(compactStatus));
+                        "Multiline overlay: %s", NotificationModule_GetStatusStr(multilineStatus));
     ApplyNotificationBackgroundColor();
     return;
 
@@ -627,21 +649,17 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 void RefreshRecentAppsNotification() {
     if (!overlayVisible || !notificationLibraryReady) return;
 
-    // Compact overlay updates only one notification instead of animating a stack.
-    const NotificationModuleHandle compactHandle = notificationHandles[kHeaderNotificationIndex];
-    if (compactHandle != 0) {
-        char compactText[128];
-        if (selectedRecentIndex == 0) {
-            BuildHomeMenuLine(compactText, sizeof(compactText));
-        } else {
-            BuildRecentAppTitleLine(selectedRecentIndex - 1, compactText, sizeof(compactText));
-        }
-        const NotificationModuleStatus compactStatus =
-            NotificationModule_UpdateDynamicNotificationText(compactHandle, compactText);
-        if (compactStatus != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+    // Update the entire multiline menu on selection changes, without new notifications.
+    const NotificationModuleHandle multilineHandle = notificationHandles[kHeaderNotificationIndex];
+    if (multilineHandle != 0) {
+        char multilineText[1024];
+        BuildMultilineRecentAppsText(multilineText, sizeof(multilineText));
+        const NotificationModuleStatus multilineStatus =
+            NotificationModule_UpdateDynamicNotificationText(multilineHandle, multilineText);
+        if (multilineStatus != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                                "Compact update failed: %s",
-                                NotificationModule_GetStatusStr(compactStatus));
+                                "Multiline update failed: %s",
+                                NotificationModule_GetStatusStr(multilineStatus));
         }
         return;
     }
