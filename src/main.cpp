@@ -44,6 +44,14 @@ constexpr uint64_t kHealthSafetyEur = 0x000500101004A200ULL;
 constexpr uint64_t kHealthSafetyKor = 0x000500101004A300ULL;
 constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
 constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
+constexpr uint64_t kNanoAssaultNeoUsa = 0x0005000010110100ULL;
+constexpr uint64_t kNanoAssaultNeoEur = 0x0005000010110600ULL;
+
+bool IsNanoAssaultNeoRunning() {
+    const uint64_t titleId = OSGetTitleID();
+    return titleId == kNanoAssaultNeoUsa || titleId == kNanoAssaultNeoEur;
+}
+
 constexpr size_t kHistoryCount = 9;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
 constexpr char kBackgroundColorStorageId[] = "background_color";
@@ -221,17 +229,21 @@ void ShowRecentAppsNotification() {
 void HideRecentAppsNotification() {
     if (!notificationLibraryReady) return;
 
+    constexpr float kNotificationExitStaggerSeconds = 0.04f;
+    const float exitStaggerSeconds = IsNanoAssaultNeoRunning() ? 0.0f : kNotificationExitStaggerSeconds;
+    float delay = 0.0f;
     bool hadNotifications = false;
 
-    // Close every row immediately; no plugin-controlled exit staggering.
+    // Nano Assault Neo: no stagger; other titles retain main's exit timing.
     for (size_t i = kHistoryCount; i-- > 0;) {
         const NotificationModuleHandle handle = notificationHandles[i];
         if (handle == 0) continue;
 
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(handle, 0.0f);
+            NotificationModule_FinishDynamicNotification(handle, delay);
         notificationHandles[i] = 0;
+        delay += exitStaggerSeconds;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
@@ -242,8 +254,9 @@ void HideRecentAppsNotification() {
     if (homeHandle != 0) {
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(homeHandle, 0.0f);
+            NotificationModule_FinishDynamicNotification(homeHandle, delay);
         notificationHandles[kHomeNotificationIndex] = 0;
+        delay += exitStaggerSeconds;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
@@ -255,7 +268,7 @@ void HideRecentAppsNotification() {
     if (headerHandle != 0) {
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(headerHandle, 0.0f);
+            NotificationModule_FinishDynamicNotification(headerHandle, delay);
         notificationHandles[kHeaderNotificationIndex] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
