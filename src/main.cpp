@@ -221,9 +221,7 @@ void ShowRecentAppsNotification() {
 void HideRecentAppsNotification() {
     if (!notificationLibraryReady) return;
 
-    constexpr float kNotificationExitStaggerSeconds = 0.04f;
     bool hadNotifications = false;
-    float delay = 0.0f;
 
     // Start at the oldest title (the bottom row) and stagger upward so the
     // stack doesn't appear to collapse all at once as the notifications fade.
@@ -233,26 +231,24 @@ void HideRecentAppsNotification() {
 
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(handle, delay);
+            NotificationModule_FinishDynamicNotification(handle, 0.0f);
         notificationHandles[i] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
         }
-        delay += kNotificationExitStaggerSeconds;
     }
 
     const NotificationModuleHandle homeHandle = notificationHandles[kHomeNotificationIndex];
     if (homeHandle != 0) {
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(homeHandle, delay);
+            NotificationModule_FinishDynamicNotification(homeHandle, 0.0f);
         notificationHandles[kHomeNotificationIndex] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
         }
-        delay += kNotificationExitStaggerSeconds;
     }
 
     // Keep the header until all rows have started to leave.
@@ -260,7 +256,7 @@ void HideRecentAppsNotification() {
     if (headerHandle != 0) {
         hadNotifications = true;
         const NotificationModuleStatus status =
-            NotificationModule_FinishDynamicNotification(headerHandle, delay);
+            NotificationModule_FinishDynamicNotification(headerHandle, 0.0f);
         notificationHandles[kHeaderNotificationIndex] = 0;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
