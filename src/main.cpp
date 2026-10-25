@@ -175,15 +175,20 @@ void ShowRecentAppsNotification() {
         return;
     }
 
-    // Diagnostic build: use a single notification for all titles to isolate slide-in cost.
-    // NotificationModule still animates this single entry; this does NOT disable slide-in.
-    {
-        const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
-            "Recent Apps: Nano diagnostic", &notificationHandles[kHeaderNotificationIndex]);
-        (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
-                            "Nano diagnostic: %s", NotificationModule_GetStatusStr(status));
-        return;
+    // Nano-compatible compact overlay: keep exactly one animated notification.
+    // Selection still navigates the complete recent-title history.
+    char compactText[128];
+    if (selectedRecentIndex == 0) {
+        BuildHomeMenuLine(compactText, sizeof(compactText));
+    } else {
+        BuildRecentAppTitleLine(selectedRecentIndex - 1, compactText, sizeof(compactText));
     }
+    const NotificationModuleStatus compactStatus =
+        NotificationModule_AddDynamicNotification(compactText, &notificationHandles[kHeaderNotificationIndex]);
+    (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                        "Compact overlay: %s", NotificationModule_GetStatusStr(compactStatus));
+    ApplyNotificationBackgroundColor();
+    return;
 
     // Notifications stack newest at the top. Add older titles first, then
     // newer titles, and finally the header so the visible order is natural.
@@ -621,6 +626,25 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 
 void RefreshRecentAppsNotification() {
     if (!overlayVisible || !notificationLibraryReady) return;
+
+    // Compact overlay updates only one notification instead of animating a stack.
+    const NotificationModuleHandle compactHandle = notificationHandles[kHeaderNotificationIndex];
+    if (compactHandle != 0) {
+        char compactText[128];
+        if (selectedRecentIndex == 0) {
+            BuildHomeMenuLine(compactText, sizeof(compactText));
+        } else {
+            BuildRecentAppTitleLine(selectedRecentIndex - 1, compactText, sizeof(compactText));
+        }
+        const NotificationModuleStatus compactStatus =
+            NotificationModule_UpdateDynamicNotificationText(compactHandle, compactText);
+        if (compactStatus != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Compact update failed: %s",
+                                NotificationModule_GetStatusStr(compactStatus));
+        }
+        return;
+    }
 
     for (size_t i = 0; i < kHistoryCount; ++i) {
         if (recentApps[i] == 0 || notificationHandles[i] == 0) continue;
