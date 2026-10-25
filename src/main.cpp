@@ -223,8 +223,7 @@ void HideRecentAppsNotification() {
 
     bool hadNotifications = false;
 
-    // Start at the oldest title (the bottom row) and stagger upward so the
-    // stack doesn't appear to collapse all at once as the notifications fade.
+    // Close every row immediately; no plugin-controlled exit staggering.
     for (size_t i = kHistoryCount; i-- > 0;) {
         const NotificationModuleHandle handle = notificationHandles[i];
         if (handle == 0) continue;
