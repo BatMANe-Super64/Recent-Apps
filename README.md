@@ -9,7 +9,7 @@
 
 Recent App Menu is an Aroma/WUPS plugin for the Wii U that displays HOME and up to nine recently used titles numbered. Select and launch titles from the on-screen menu, including during startup sequences.
 
-[![Latest release](https://img.shields.io/github/v/release/BatMANe-Super64/Recent-Apps?label=Latest%20release)](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest) 
+[![Latest release](https://img.shields.io/github/v/release/BatMANe-Super64/Recent-Apps?label=Latest%20release)](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest) [![Build](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml/badge.svg)](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml)
 
 **[Download the latest release](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest)** · [Installation instructions](#install) · [Release history](https://github.com/BatMANe-Super64/Recent-Apps/releases)
 
