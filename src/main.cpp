@@ -175,6 +175,24 @@ void ApplyNotificationBackgroundColor() {
     }
 }
 
+void ApplyNanoCompactSelectionColor() {
+    if (!notificationLibraryReady) return;
+    const NotificationModuleHandle handle = notificationHandles[kHeaderNotificationIndex];
+    if (handle == 0) return;
+
+    uint32_t selection = backgroundColorSelection;
+    if (selectedRecentIndex > 0 && selectedRecentIndex <= kHistoryCount) {
+        const uint32_t slotSelection = slotBackgroundColorSelections[selectedRecentIndex - 1];
+        if (slotSelection != kUseGlobalBackgroundColor) {
+            selection = slotSelection;
+        }
+    }
+
+    // The default uses NotificationModule's standard gray background.
+    (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(
+        handle, BackgroundColorForSelection(selection));
+}
+
 void HideRecentAppsNotification();
 
 void BuildNanoCompactText(char* text, size_t size) {
@@ -202,7 +220,7 @@ void ShowRecentAppsNotification() {
                                 "Nano compact overlay failed: %s", NotificationModule_GetStatusStr(status));
             return;
         }
-        ApplyNotificationBackgroundColor();
+        ApplyNanoCompactSelectionColor();
         return;
     }
 
@@ -649,6 +667,7 @@ void RefreshRecentAppsNotification() {
         char compactText[128];
         BuildNanoCompactText(compactText, sizeof(compactText));
         const NotificationModuleStatus status = NotificationModule_UpdateDynamicNotificationText(handle, compactText);
+        ApplyNanoCompactSelectionColor();
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Nano compact update failed: %s", NotificationModule_GetStatusStr(status));
