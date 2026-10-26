@@ -28,6 +28,12 @@ Recent App Menu is an Aroma/WUPS plugin for the Wii U that displays HOME and up 
 - **Automatic Compatibility Mode:** Uses a lightweight, single-notification menu in *Nano Assault Neo* to avoid the freezing caused by the full overlay. The standard full menu remains available in other titles.
 - **Selection-Matched Colors:** In compatibility mode, the notification background follows the selected title's configured slot color, including global-color inheritance.
 
+
+## Controls
+
+Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
+
+
 ## Compatibility
 
 ### Nano Assault Neo
@@ -35,10 +41,6 @@ Recent App Menu is an Aroma/WUPS plugin for the Wii U that displays HOME and up 
 *Recent App Menu v1.1.0* introduces an automatic compact display mode for *Nano Assault Neo*. Instead of showing the full multi-notification list, the plugin displays the currently selected HOME or recent-title entry in one dynamically updated notification. Use **Up/Down** to cycle through entries and **TV + A** to launch the selection. The background color updates to match the selected slot's saved color setting; HOME uses the global background color.
 
 This title-specific mode reduces notification overhead to address freezes observed with the standard overlay. No additional settings or NotificationModule modifications are required. Other titles retain the original multi-entry menu and animations. Compatibility with every Wii U title is not guaranteed.
-
-## Controls
-
-Open the menu with **TV + L**. While it is open, use **Up/Down** to move through HOME and recent titles, then press **A** to open HOME or launch the selected title. Press **TV + L** again or press **B** to close the menu.
 
 ## Requirements
 
