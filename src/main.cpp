@@ -44,6 +44,15 @@ constexpr uint64_t kHealthSafetyEur = 0x000500101004A200ULL;
 constexpr uint64_t kHealthSafetyKor = 0x000500101004A300ULL;
 constexpr uint64_t kHealthSafetyTwn = 0x000500101004A400ULL;
 constexpr uint64_t kHealthSafetyChn = 0x000500101004A500ULL;
+constexpr uint64_t kNanoAssaultNeoUsa = 0x0005000010110100ULL;
+constexpr uint64_t kNanoAssaultNeoEur = 0x0005000010110600ULL;
+constexpr uint64_t kNanoAssaultNeoJpn = 0x0005000010136400ULL;
+
+bool IsNanoAssaultNeoRunning() {
+    const uint64_t titleId = OSGetTitleID();
+    return titleId == kNanoAssaultNeoUsa || titleId == kNanoAssaultNeoEur || titleId == kNanoAssaultNeoJpn;
+}
+
 constexpr size_t kHistoryCount = 9;
 constexpr char kHistoryStorageId[] = "recent_apps_history";
 constexpr char kBackgroundColorStorageId[] = "background_color";
@@ -166,12 +175,52 @@ void ApplyNotificationBackgroundColor() {
     }
 }
 
+void ApplyNanoCompactSelectionColor() {
+    if (!notificationLibraryReady) return;
+    const NotificationModuleHandle handle = notificationHandles[kHeaderNotificationIndex];
+    if (handle == 0) return;
+
+    uint32_t selection = backgroundColorSelection;
+    if (selectedRecentIndex > 0 && selectedRecentIndex <= kHistoryCount) {
+        const uint32_t slotSelection = slotBackgroundColorSelections[selectedRecentIndex - 1];
+        if (slotSelection != kUseGlobalBackgroundColor) {
+            selection = slotSelection;
+        }
+    }
+
+    // The default uses NotificationModule's standard gray background.
+    (void)NotificationModule_UpdateDynamicNotificationBackgroundColor(
+        handle, BackgroundColorForSelection(selection));
+}
+
 void HideRecentAppsNotification();
+
+void BuildNanoCompactText(char* text, size_t size) {
+    if (selectedRecentIndex == 0) {
+        BuildHomeMenuLine(text, size);
+    } else {
+        BuildRecentAppTitleLine(selectedRecentIndex - 1, text, size);
+    }
+}
 
 void ShowRecentAppsNotification() {
     if (!notificationLibraryReady) {
         (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                             "NotificationModule: unavailable");
+        return;
+    }
+
+    if (IsNanoAssaultNeoRunning()) {
+        char compactText[128];
+        BuildNanoCompactText(compactText, sizeof(compactText));
+        const NotificationModuleStatus status = NotificationModule_AddDynamicNotification(
+            compactText, &notificationHandles[kHeaderNotificationIndex]);
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Nano compact overlay failed: %s", NotificationModule_GetStatusStr(status));
+            return;
+        }
+        ApplyNanoCompactSelectionColor();
         return;
     }
 
@@ -222,11 +271,11 @@ void HideRecentAppsNotification() {
     if (!notificationLibraryReady) return;
 
     constexpr float kNotificationExitStaggerSeconds = 0.04f;
-    bool hadNotifications = false;
+    const float exitStaggerSeconds = IsNanoAssaultNeoRunning() ? 0.0f : kNotificationExitStaggerSeconds;
     float delay = 0.0f;
+    bool hadNotifications = false;
 
-    // Start at the oldest title (the bottom row) and stagger upward so the
-    // stack doesn't appear to collapse all at once as the notifications fade.
+    // Nano Assault Neo: no stagger; other titles retain main's exit timing.
     for (size_t i = kHistoryCount; i-- > 0;) {
         const NotificationModuleHandle handle = notificationHandles[i];
         if (handle == 0) continue;
@@ -235,11 +284,11 @@ void HideRecentAppsNotification() {
         const NotificationModuleStatus status =
             NotificationModule_FinishDynamicNotification(handle, delay);
         notificationHandles[i] = 0;
+        delay += exitStaggerSeconds;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
         }
-        delay += kNotificationExitStaggerSeconds;
     }
 
     const NotificationModuleHandle homeHandle = notificationHandles[kHomeNotificationIndex];
@@ -248,11 +297,11 @@ void HideRecentAppsNotification() {
         const NotificationModuleStatus status =
             NotificationModule_FinishDynamicNotification(homeHandle, delay);
         notificationHandles[kHomeNotificationIndex] = 0;
+        delay += exitStaggerSeconds;
         if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
             (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
                                 "Notification close failed: %s", NotificationModule_GetStatusStr(status));
         }
-        delay += kNotificationExitStaggerSeconds;
     }
 
     // Keep the header until all rows have started to leave.
@@ -611,6 +660,20 @@ void RecentAppsComboCallback(WUPSButtonCombo_ControllerTypes, WUPSButtonCombo_Co
 
 void RefreshRecentAppsNotification() {
     if (!overlayVisible || !notificationLibraryReady) return;
+
+    if (IsNanoAssaultNeoRunning()) {
+        const NotificationModuleHandle handle = notificationHandles[kHeaderNotificationIndex];
+        if (handle == 0) return;
+        char compactText[128];
+        BuildNanoCompactText(compactText, sizeof(compactText));
+        const NotificationModuleStatus status = NotificationModule_UpdateDynamicNotificationText(handle, compactText);
+        ApplyNanoCompactSelectionColor();
+        if (status != NOTIFICATION_MODULE_RESULT_SUCCESS) {
+            (void)std::snprintf(notificationStatusLine, sizeof(notificationStatusLine),
+                                "Nano compact update failed: %s", NotificationModule_GetStatusStr(status));
+        }
+        return;
+    }
 
     for (size_t i = 0; i < kHistoryCount; ++i) {
         if (recentApps[i] == 0 || notificationHandles[i] == 0) continue;
