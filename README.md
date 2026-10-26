@@ -5,18 +5,22 @@
 <img width="1800" height="1197" alt="IMG_1971" src="https://github.com/user-attachments/assets/031824df-74d6-473f-85f5-e8444925a4aa" />
 
 
-# Recent Apps for Wii U
+# Recent App Menu for Wii U
 
-Recent Apps is an Aroma/WUPS plugin for the Wii U that displays HOME and up to nine recently used titles numbered. Select and launch titles from the on-screen menu, including during startup sequences.
+Recent App Menu is an Aroma/WUPS plugin for the Wii U that displays HOME and up to nine recently used titles numbered. Select and launch titles from the on-screen menu, including during startup sequences.
+
+[![Latest release](https://img.shields.io/github/v/release/BatMANe-Super64/Recent-Apps?label=Latest%20release)](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest) [![Build](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml/badge.svg)](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml)
+
+**[Download the latest release](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest)** · [Installation instructions](#install) · [Release history](https://github.com/BatMANe-Super64/Recent-Apps/releases)
 
 ## Features
 
 - Tracks up to nine recently used titles and keeps the newest title first, with a separate HOME entry.
 - Displays title names from installed-title metadata
 - **Early Title Switching:** Launch another title or return to HOME during startup, without waiting for the current game to finish loading.
-- **In-Game Overlay:** Open Recent Apps with **TV + L** over supported games and applications.
+- **In-Game Overlay:** Open Recent App Menu with **TV + L** over supported games and applications.
 - **Dynamic UI Colors:** Distinct background color blocks make individual entries easy to distinguish.
-- Opens and closes the Recent Apps notification with a controller shortcut.
+- Opens and closes the Recent App Menu notification with a controller shortcut.
 - Lets you move through recorded titles and launch the selected title.
 - **Persistent History:** Recent-title entries and their order are saved between sessions.
 - **Persistent Color Settings:** Your color space choices are saved and restored between sessions.
@@ -73,13 +77,13 @@ Copy `RecentAppMenu.wps` to the plugins directory in your Aroma environment, for
 sd:/wiiu/environments/aroma/plugins/RecentAppMenu.wps
 ```
 
-Download the latest published package from [GitHub Releases](https://github.com/BatMANe-Super64/Recent-Apps/releases), use the artifact named `RecentAppMenu-Plugin` from a successful [GitHub Actions](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml) run, or build the package locally. Note that a published release asset may lag behind the latest `main` build.
+Download the latest published package from [GitHub Releases](https://github.com/BatMANe-Super64/Recent-Apps/releases/latest), use the artifact named `RecentAppMenu-Plugin` from a successful [GitHub Actions](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml) run, or build the package locally. Note that a published release asset may lag behind the latest `main` build.
 
 ## Notes
 
 - The history holds up to nine distinct recently used titles, in addition to the separate HOME entry. The list and its order persist between sessions; launching a title already in history moves it to the newest position.
 - Color space choices persist between sessions.
-- Health and Safety is filtered from automatic history updates. An explicit launch from Recent Apps may add it to the list.
+- Health and Safety is filtered from automatic history updates. An explicit launch from Recent App Menu may add it to the list.
 - NotificationModule must be available for the on-screen notification interface. If it cannot initialize, history tracking can still run but the notification UI will not be available.
 - The plugin's configuration menu includes status information for history storage, shortcut registration, notifications, and diagnostic GX2 hooks.
 
