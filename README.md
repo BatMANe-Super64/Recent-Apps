@@ -14,13 +14,23 @@ Recent Apps is an Aroma/WUPS plugin for the Wii U that displays HOME and up to n
 - Tracks up to nine recently used titles and keeps the newest title first, with a separate HOME entry.
 - Displays title names from installed-title metadata
 - **Early Title Switching:** Launch another title or return to HOME during startup, without waiting for the current game to finish loading.
-- **In-Game Overlay:** Open Recent Apps with **TV + L** over ANY active games or applications.
+- **In-Game Overlay:** Open Recent Apps with **TV + L** over supported games and applications.
 - **Dynamic UI Colors:** Distinct background color blocks make individual entries easy to distinguish.
 - Opens and closes the Recent Apps notification with a controller shortcut.
 - Lets you move through recorded titles and launch the selected title.
 - **Persistent History:** Recent-title entries and their order are saved between sessions.
 - **Persistent Color Settings:** Your color space choices are saved and restored between sessions.
-- Plays Nice with the aroma plugin config menu.
+- Respects the Aroma plugin configuration menu and avoids conflicting controller input.
+- **Automatic Compatibility Mode:** Uses a lightweight, single-notification menu in *Nano Assault Neo* to avoid the freezing caused by the full overlay. The standard full menu remains available in other titles.
+- **Selection-Matched Colors:** In compatibility mode, the notification background follows the selected title's configured slot color, including global-color inheritance.
+
+## Compatibility
+
+### Nano Assault Neo
+
+*Recent App Menu v1.1.0* introduces an automatic compact display mode for *Nano Assault Neo*. Instead of showing the full multi-notification list, the plugin displays the currently selected HOME or recent-title entry in one dynamically updated notification. Use **Up/Down** to cycle through entries and **TV + A** to launch the selection. The background color updates to match the selected slot's saved color setting; HOME uses the global background color.
+
+This title-specific mode reduces notification overhead to address freezes observed with the standard overlay. No additional settings or NotificationModule modifications are required. Other titles retain the original multi-entry menu and animations. Compatibility with every Wii U title is not guaranteed.
 
 ## Controls
 
@@ -63,7 +73,7 @@ Copy `RecentAppMenu.wps` to the plugins directory in your Aroma environment, for
 sd:/wiiu/environments/aroma/plugins/RecentAppMenu.wps
 ```
 
-Use the artifact named `RecentAppMenu-Plugin` from a successful GitHub Actions run, or build the package locally.
+Download the latest published package from [GitHub Releases](https://github.com/BatMANe-Super64/Recent-Apps/releases), use the artifact named `RecentAppMenu-Plugin` from a successful [GitHub Actions](https://github.com/BatMANe-Super64/Recent-Apps/actions/workflows/build.yml) run, or build the package locally. Note that a published release asset may lag behind the latest `main` build.
 
 ## Notes
 
